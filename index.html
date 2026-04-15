@@ -585,7 +585,7 @@ function doConnect(){
   if(!url||!url.startsWith('https://')){toast('Paste a valid URL');return;}
   connectSync(url);rSettBody();
 }
-function openSettings(){editId=null;showAddForm=false;rSettBody();document.getElementById("settModal").classList.add("show");}
+function openSettings(){editId=null;showAddForm=false;rSettBody();document.getElementById("settModal").classList.add("show");pullAndRender();}
 function closeSettings(){document.getElementById("settModal").classList.remove("show");}
 function rSettBody(){
   const body=document.getElementById("sett-body");body.innerHTML="";
@@ -743,7 +743,7 @@ function closeSub(){
   document.getElementById("nb").style.display="none";
   document.getElementById("settBtn").style.display="flex";
   document.getElementById("nt").textContent="⭐ Star Quest";
-  render();
+  render();pullAndRender();
 }
 function showTab(name,el){
   ctab=name;
@@ -754,6 +754,7 @@ function showTab(name,el){
   document.getElementById("nb").style.display="none";
   document.getElementById("settBtn").style.display="flex";
   document.getElementById("nt").textContent="⭐ Star Quest";
+  pullAndRender();
 }
 let toastT=null;
 function toast(msg){
@@ -844,13 +845,14 @@ function updSyncDot(){
   d.className='sync-ind '+syncStatus;
   d.title={off:'Cloud sync off',ok:'Synced',busy:'Syncing...',err:'Sync error — tap Settings'}[syncStatus]||'';
 }
+let pushing=false;
 function scheduleSync(){
   if(!syncCfg)return;
-  clearTimeout(syncTimer);syncTimer=setTimeout(()=>cloudPush(),1500);
+  clearTimeout(syncTimer);syncTimer=setTimeout(()=>cloudPush(),500);
 }
 async function cloudPush(){
-  if(!syncCfg||!syncCfg.url)return;
-  syncStatus='busy';updSyncDot();
+  if(!syncCfg||!syncCfg.url||pushing)return;
+  pushing=true;syncStatus='busy';updSyncDot();
   const payload={};payload['w_'+weekKey]=wst;payload['global']=gst;
   try{
     const d=encodeURIComponent(JSON.stringify(payload));
@@ -861,13 +863,13 @@ async function cloudPush(){
   }catch(e){
     console.warn('Sync push err:',e);syncStatus='err';
   }
-  updSyncDot();
+  pushing=false;updSyncDot();
 }
 async function cloudPull(){
   if(!syncCfg||!syncCfg.url)return false;
   syncStatus='busy';updSyncDot();
   try{
-    const r=await fetch(syncCfg.url+'?action=read',{redirect:'follow'});
+    const r=await fetch(syncCfg.url+'?action=read&t='+Date.now(),{redirect:'follow',cache:'no-store'});
     if(!r.ok)throw new Error(r.status);
     const data=await r.json();
     if(data&&typeof data==='object'){
@@ -879,6 +881,12 @@ async function cloudPull(){
     }
     syncStatus='ok';updSyncDot();return false;
   }catch(e){console.warn('Sync pull err:',e);syncStatus='err';updSyncDot();return false;}
+}
+// Pull from cloud then re-render (used on tab switch, focus, etc.)
+async function pullAndRender(){
+  if(!syncCfg)return;
+  const ok=await cloudPull();
+  if(ok)render();
 }
 function connectSync(url){
   syncCfg={url:url.replace(/\/$/,''),lastSync:null};saveSyncCfg();
@@ -897,8 +905,26 @@ async function manualPush(){
   await cloudPush();toast(syncStatus==='ok'?'☁️ Pushed!':'Push failed');rSettBody();
 }
 
-load();loadSyncCfg();render();setInterval(tick,30000);
-if(syncCfg){cloudPull().then(ok=>{if(ok)render();});}
+// ── Init: cloud-first load ──────────────────
+load();loadSyncCfg();
+if(syncCfg){
+  // Show loading state while pulling cloud data
+  document.getElementById('ns').textContent='☁️ Syncing...';
+  cloudPull().then(()=>{render();}).catch(()=>{render();});
+} else {
+  render();
+}
+setInterval(tick,30000);
+// Periodic cloud sync every 30s
+setInterval(()=>{if(syncCfg)pullAndRender();},30000);
+// Re-sync when user returns to the tab/app
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&syncCfg)pullAndRender();
+});
+// Re-sync on window focus (covers mobile app switching)
+window.addEventListener('focus',()=>{
+  if(syncCfg)pullAndRender();
+});
 </script>
 </body>
 </html>
