@@ -608,13 +608,16 @@ function rSettBody(){
       <button class="sync-btn connect" onclick="doConnect()">Connect</button>`;
   } else {
     const ls=syncCfg.lastSync?new Date(syncCfg.lastSync).toLocaleString():'Never';
+    const shareUrl=location.origin+location.pathname+'#sync='+encodeURIComponent(syncCfg.url);
     syncDiv.innerHTML=`
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         <span class="sync-ind ${syncStatus}" style="width:10px;height:10px;"></span>
         <span style="font-size:14px;font-weight:800;color:var(--green);">Connected</span>
       </div>
-      <div class="sync-hint" style="margin-bottom:4px;">URL: <span style="word-break:break-all;color:var(--text);">${syncCfg.url.slice(0,50)}…</span></div>
-      <div class="sync-hint" style="margin-bottom:12px;">Last sync: ${ls}</div>
+      <div class="sync-hint" style="margin-bottom:4px;">Last sync: ${ls}</div>
+      <div class="sync-hint" style="margin-bottom:8px;">Open this link on any device to see the same data:</div>
+      <input class="sync-inp" readonly value="${shareUrl}" onclick="this.select();navigator.clipboard&&navigator.clipboard.writeText(this.value).then(()=>toast('Link copied!'));" style="font-size:11px;margin-bottom:4px;cursor:pointer;">
+      <div class="sync-hint" style="margin-bottom:12px;color:var(--blue);">Tap the link above to copy it.</div>
       <button class="sync-btn pull" onclick="manualPull()">↓ Pull from Cloud</button>
       <button class="sync-btn push" onclick="manualPush()">↑ Push to Cloud</button>
       <button class="sync-btn disconnect" onclick="if(confirm('Disconnect cloud sync?'))disconnectSync(),rSettBody()">Disconnect</button>`;
@@ -832,13 +835,29 @@ function saveData(sheet, data) {
   }
 }`;
 
+function getSyncUrlFromHash(){
+  try{const h=location.hash;if(!h)return null;const p=new URLSearchParams(h.slice(1));return p.get('sync')||null;}catch{return null;}
+}
+function setSyncUrlInHash(url){
+  if(url){const p=new URLSearchParams(location.hash.slice(1));p.set('sync',url);history.replaceState(null,'','#'+p.toString());}
+  else{history.replaceState(null,'',location.pathname);}
+}
 function loadSyncCfg(){
-  try{syncCfg=JSON.parse(localStorage.getItem(SYNC_KEY)||'null');}catch{syncCfg=null;}
+  // URL hash is the source of truth — if sync URL is in the hash, use it
+  const hashUrl=getSyncUrlFromHash();
+  if(hashUrl){
+    syncCfg={url:hashUrl,lastSync:null};
+    localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));
+  } else {
+    try{syncCfg=JSON.parse(localStorage.getItem(SYNC_KEY)||'null');}catch{syncCfg=null;}
+    // If we have a stored config, put it in the URL hash too
+    if(syncCfg&&syncCfg.url)setSyncUrlInHash(syncCfg.url);
+  }
   syncStatus=syncCfg?'ok':'off';updSyncDot();
 }
 function saveSyncCfg(){
-  if(syncCfg)localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));
-  else localStorage.removeItem(SYNC_KEY);
+  if(syncCfg){localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));setSyncUrlInHash(syncCfg.url);}
+  else{localStorage.removeItem(SYNC_KEY);setSyncUrlInHash(null);}
 }
 function updSyncDot(){
   const d=document.getElementById('syncDot');if(!d)return;
