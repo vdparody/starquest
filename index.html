@@ -195,6 +195,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
 .utw{position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 16px 16px;background:rgba(255,255,255,.2);overflow:hidden;}
 .utb{height:3px;background:var(--yellow);width:100%;}
 .ubtn{background:var(--yellow);color:#1a237e;border:none;border-radius:9px;padding:6px 13px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;}
+.sync-ind{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:6px;vertical-align:middle;}
+.sync-ind.off{background:#9e9e9e;}
+.sync-ind.ok{background:#4CAF50;}
+.sync-ind.busy{background:#FFD700;animation:spulse 1s infinite;}
+.sync-ind.err{background:#f44336;}
+@keyframes spulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.sync-card{background:var(--card);border-radius:16px;margin:12px 14px 0;padding:16px;border:2px solid var(--border);box-shadow:0 2px 0 var(--border);}
+.sync-card.on{border-color:#A5D6A7;box-shadow:0 2px 0 #A5D6A7;}
+.sync-inp{width:100%;padding:9px 12px;border-radius:10px;border:2px solid var(--border);font-size:13px;font-family:inherit;color:var(--text);background:#fff;margin-bottom:8px;box-sizing:border-box;}
+.sync-inp:focus{outline:none;border-color:var(--blue);}
+.sync-btn{border:none;border-radius:12px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-top:6px;text-align:center;}
+.sync-btn.connect{background:var(--blue);color:#fff;box-shadow:0 2px 0 #0D47A1;}
+.sync-btn.disconnect{background:var(--red-l);color:var(--red);border:2px solid var(--red-m);box-shadow:none;}
+.sync-btn.pull{background:var(--green);color:#fff;box-shadow:0 2px 0 #1B5E20;margin-top:8px;}
+.sync-btn.push{background:var(--yellow);color:#1a237e;box-shadow:0 2px 0 var(--yellow-d);margin-top:6px;}
+.sync-btn:active{transform:translateY(2px);box-shadow:none;}
+.sync-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.sync-hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.5;font-weight:600;}
+.sync-status{display:flex;align-items:center;gap:8px;padding:10px 0 6px;font-size:12px;font-weight:700;}
 </style>
 </head>
 <body>
@@ -206,6 +225,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
   <div class="nav-bar">
     <button class="nav-back" id="nb" onclick="closeSub()">‹ Back</button>
     <div><div class="nav-title" id="nt">⭐ Star Quest</div><div class="nav-sub" id="ns"></div></div>
+    <span class="sync-ind off" id="syncDot"></span>
     <button class="nav-settings" id="settBtn" onclick="openSettings()">⚙️</button>
   </div>
   <div class="screen">
@@ -355,6 +375,7 @@ function load(){
 function sv(){
   try{localStorage.setItem("sq_w_"+weekKey,JSON.stringify(wst));}catch{}
   try{localStorage.setItem("sq_g",JSON.stringify(gst));}catch{}
+  scheduleSync();
 }
 
 function rawPts(){let p=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};req4day(o).forEach(t=>{if(dm[t.id])p++;});}return p;}
@@ -558,10 +579,48 @@ function rShop(){
 }
 
 // Settings
+function doConnect(){
+  const inp=document.getElementById('sync-url-inp');
+  const url=(inp?inp.value:'').trim();
+  if(!url||!url.startsWith('https://')){toast('Paste a valid URL');return;}
+  connectSync(url);rSettBody();
+}
 function openSettings(){editId=null;showAddForm=false;rSettBody();document.getElementById("settModal").classList.add("show");}
 function closeSettings(){document.getElementById("settModal").classList.remove("show");}
 function rSettBody(){
   const body=document.getElementById("sett-body");body.innerHTML="";
+  // ── Cloud Sync section ──
+  body.innerHTML+=`<div class="sett-section-label">☁️ Cloud Sync</div>`;
+  const syncDiv=document.createElement('div');syncDiv.className='sync-card'+(syncCfg?' on':'');
+  if(!syncCfg){
+    syncDiv.innerHTML=`
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px;">Sync across devices</div>
+      <div class="sync-hint" style="margin-bottom:12px;">Use a Google Sheet to save your data in the cloud. Your data will sync automatically whenever you make changes.</div>
+      <div style="font-size:12px;font-weight:800;color:var(--sub);margin-bottom:8px;">SETUP STEPS</div>
+      <div class="sync-hint" style="margin-bottom:4px;">1. Create a new <b>Google Sheet</b></div>
+      <div class="sync-hint" style="margin-bottom:4px;">2. Go to <b>Extensions → Apps Script</b></div>
+      <div class="sync-hint" style="margin-bottom:4px;">3. Delete any code there, paste the script below</div>
+      <div class="sync-hint" style="margin-bottom:4px;">4. Click <b>Deploy → New deployment</b></div>
+      <div class="sync-hint" style="margin-bottom:4px;">5. Type = <b>Web app</b>, Access = <b>Anyone</b></div>
+      <div class="sync-hint" style="margin-bottom:12px;">6. Copy the <b>Web app URL</b> and paste below</div>
+      <details style="margin-bottom:12px;"><summary style="font-size:12px;font-weight:700;color:var(--blue);cursor:pointer;">Show Apps Script code to copy</summary><textarea readonly onclick="this.select()" style="width:100%;height:180px;font-size:10px;font-family:monospace;margin-top:8px;padding:8px;border:2px solid var(--border);border-radius:10px;background:#F5F7FF;resize:vertical;box-sizing:border-box;">${APPS_SCRIPT_CODE}</textarea></details>
+      <input class="sync-inp" id="sync-url-inp" type="url" placeholder="Paste your Web app URL here">
+      <button class="sync-btn connect" onclick="doConnect()">Connect</button>`;
+  } else {
+    const ls=syncCfg.lastSync?new Date(syncCfg.lastSync).toLocaleString():'Never';
+    syncDiv.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span class="sync-ind ${syncStatus}" style="width:10px;height:10px;"></span>
+        <span style="font-size:14px;font-weight:800;color:var(--green);">Connected</span>
+      </div>
+      <div class="sync-hint" style="margin-bottom:4px;">URL: <span style="word-break:break-all;color:var(--text);">${syncCfg.url.slice(0,50)}…</span></div>
+      <div class="sync-hint" style="margin-bottom:12px;">Last sync: ${ls}</div>
+      <button class="sync-btn pull" onclick="manualPull()">↓ Pull from Cloud</button>
+      <button class="sync-btn push" onclick="manualPush()">↑ Push to Cloud</button>
+      <button class="sync-btn disconnect" onclick="if(confirm('Disconnect cloud sync?'))disconnectSync(),rSettBody()">Disconnect</button>`;
+  }
+  body.appendChild(syncDiv);
+  // ── Token Balance section ──
   body.innerHTML+=`<div class="sett-section-label">🟡 Token Balance</div>`;
   const tokDiv=document.createElement("div");tokDiv.className="tok-editor";
   tokDiv.innerHTML=`<div class="tok-editor-title">Adjust token balance</div><div class="tok-current" id="sett-tok-display">🟡 ${gst.tokens}</div><div class="tok-adj-grid"><button class="tok-adj-btn plus" onclick="adjTokens(1)">+1</button><button class="tok-adj-btn plus" onclick="adjTokens(5)">+5</button><button class="tok-adj-btn plus" onclick="adjTokens(10)">+10</button><button class="tok-adj-btn minus" onclick="adjTokens(-1)">−1</button><button class="tok-adj-btn minus" onclick="adjTokens(-5)">−5</button><button class="tok-adj-btn minus" onclick="adjTokens(-10)">−10</button></div><div class="tok-manual-row"><input class="tok-input" id="tok-manual-inp" type="number" min="0" placeholder="Set exact amount" value="${gst.tokens}"><button class="tok-set-btn" onclick="setTokensManual()">Set</button></div>`;
@@ -705,7 +764,141 @@ function toast(msg){
   clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),2200);
 }
 
-load();render();setInterval(tick,30000);
+// ── Cloud Sync via Google Sheets ─────────────
+const SYNC_KEY='sq_sync_cfg';
+let syncCfg=null,syncStatus='off',syncTimer=null;
+
+const APPS_SCRIPT_CODE=`// Paste this into Google Apps Script (Extensions → Apps Script)
+// Then Deploy → New deployment → Web app → Anyone can access
+
+function doGet(e) {
+  var sheet = getSheet();
+  var action = (e.parameter && e.parameter.action) || 'read';
+  if (action === 'save') {
+    var data = JSON.parse(decodeURIComponent(e.parameter.data || '{}'));
+    saveData(sheet, data);
+    return ContentService.createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput(JSON.stringify(readData(sheet)))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var sheet = getSheet();
+  var data = JSON.parse(e.postData.contents || '{}');
+  saveData(sheet, data);
+  return ContentService.createTextOutput(JSON.stringify({ok:true}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('SyncData');
+  if (!sheet) {
+    sheet = ss.insertSheet('SyncData');
+    sheet.appendRow(['key','value','updated']);
+  }
+  return sheet;
+}
+
+function readData(sheet) {
+  var rows = sheet.getDataRange().getValues();
+  var data = {};
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0]) {
+      try { data[rows[i][0]] = JSON.parse(rows[i][1]); }
+      catch(e) { data[rows[i][0]] = rows[i][1]; }
+    }
+  }
+  return data;
+}
+
+function saveData(sheet, data) {
+  var rows = sheet.getDataRange().getValues();
+  var now = new Date().toISOString();
+  var keys = Object.keys(data);
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k], found = false;
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i][0] === key) {
+        sheet.getRange(i+1, 2).setValue(JSON.stringify(data[key]));
+        sheet.getRange(i+1, 3).setValue(now);
+        found = true; break;
+      }
+    }
+    if (!found) sheet.appendRow([key, JSON.stringify(data[key]), now]);
+  }
+}`;
+
+function loadSyncCfg(){
+  try{syncCfg=JSON.parse(localStorage.getItem(SYNC_KEY)||'null');}catch{syncCfg=null;}
+  syncStatus=syncCfg?'ok':'off';updSyncDot();
+}
+function saveSyncCfg(){
+  if(syncCfg)localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));
+  else localStorage.removeItem(SYNC_KEY);
+}
+function updSyncDot(){
+  const d=document.getElementById('syncDot');if(!d)return;
+  d.className='sync-ind '+syncStatus;
+  d.title={off:'Cloud sync off',ok:'Synced',busy:'Syncing...',err:'Sync error — tap Settings'}[syncStatus]||'';
+}
+function scheduleSync(){
+  if(!syncCfg)return;
+  clearTimeout(syncTimer);syncTimer=setTimeout(()=>cloudPush(),1500);
+}
+async function cloudPush(){
+  if(!syncCfg||!syncCfg.url)return;
+  syncStatus='busy';updSyncDot();
+  const payload={};payload['w_'+weekKey]=wst;payload['global']=gst;
+  try{
+    const d=encodeURIComponent(JSON.stringify(payload));
+    const url=syncCfg.url+'?action=save&data='+d;
+    const r=await fetch(url,{redirect:'follow'});
+    if(!r.ok)throw new Error(r.status);
+    syncCfg.lastSync=Date.now();saveSyncCfg();syncStatus='ok';
+  }catch(e){
+    console.warn('Sync push err:',e);syncStatus='err';
+  }
+  updSyncDot();
+}
+async function cloudPull(){
+  if(!syncCfg||!syncCfg.url)return false;
+  syncStatus='busy';updSyncDot();
+  try{
+    const r=await fetch(syncCfg.url+'?action=read',{redirect:'follow'});
+    if(!r.ok)throw new Error(r.status);
+    const data=await r.json();
+    if(data&&typeof data==='object'){
+      const wk='w_'+weekKey;
+      if(data[wk]){wst=data[wk];localStorage.setItem('sq_w_'+weekKey,JSON.stringify(wst));}
+      if(data.global){const g=data.global;gst={...defG(),...g};localStorage.setItem('sq_g',JSON.stringify(gst));}
+      syncCfg.lastSync=Date.now();saveSyncCfg();
+      syncStatus='ok';updSyncDot();return true;
+    }
+    syncStatus='ok';updSyncDot();return false;
+  }catch(e){console.warn('Sync pull err:',e);syncStatus='err';updSyncDot();return false;}
+}
+function connectSync(url){
+  syncCfg={url:url.replace(/\/$/,''),lastSync:null};saveSyncCfg();
+  syncStatus='ok';updSyncDot();
+  cloudPull().then(ok=>{if(ok)render();else cloudPush();});
+  toast('☁️ Connected!');
+}
+function disconnectSync(){
+  syncCfg=null;saveSyncCfg();syncStatus='off';updSyncDot();toast('Sync off');
+}
+async function manualPull(){
+  const ok=await cloudPull();if(ok){render();toast('☁️ Pulled!');}else toast('Nothing to pull');
+  rSettBody();
+}
+async function manualPush(){
+  await cloudPush();toast(syncStatus==='ok'?'☁️ Pushed!':'Push failed');rSettBody();
+}
+
+load();loadSyncCfg();render();setInterval(tick,30000);
+if(syncCfg){cloudPull().then(ok=>{if(ok)render();});}
 </script>
 </body>
 </html>
