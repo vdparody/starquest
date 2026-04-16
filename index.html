@@ -310,6 +310,9 @@ const BT=[
   {id:"trash", icon:"🗑️",bg:"#EFEBE9",fg:"#4E342E",name:"Take out trash",     cat:"🏠 Chores",    sub:"When needed"},
   {id:"meal",  icon:"🥣",bg:"#FFF3E0",fg:"#BF360C",name:"Finish meal",        cat:"🍴 Self-care", sub:"Eat up by himself"},
   {id:"sister",icon:"👧",bg:"#FCE4EC",fg:"#880E4F",name:"Play with sister",   cat:"👨‍👩‍👧 Family",  sub:"20 min nicely"},
+  {id:"schoolbag", icon:"🎒",bg:"#E8EAF6",fg:"#283593",name:"Prepare school bag",  cat:"🏠 Chores",    sub:"Pack bag the night before"},
+  {id:"uniform",   icon:"👕",bg:"#F3E5F5",fg:"#6A1B9A",name:"Prepare uniform",     cat:"🏠 Chores",    sub:"Lay out clothes the night before"},
+  {id:"dresself",  icon:"🧥",bg:"#E0F2F1",fg:"#00695C",name:"Get dressed independently", cat:"🌅 Morning",   sub:"Dress yourself before leaving"},
 ];
 const PEN_LIST=[
   {id:"yell", icon:"📢",name:"Yelling or screaming",    cat:"🗣️ Communication"},
@@ -322,6 +325,9 @@ const PEN_LIST=[
   {id:"rules",icon:"🚫",name:"Breaking rules on purpose",cat:"🚦 Safety"},
   {id:"blame",icon:"👉",name:"Blaming others",          cat:"🧠 Responsibility"},
   {id:"listen",icon:"👂",name:"Not listening",          cat:"🧠 Responsibility"},
+  {id:"procras",icon:"⏰",name:"Procrastinating",       cat:"🧠 Responsibility"},
+  {id:"fool",  icon:"🤪",name:"Fooling around",         cat:"💥 Behaviour"},
+  {id:"picky", icon:"🥗",name:"Picky eating",            cat:"🍴 Self-care"},
 ];
 const EX=[
   {id:"pp",icon:"🐾",label:"1 Paw Patrol episode",sub:"~23 min"},
@@ -337,7 +343,7 @@ const DEFAULT_SHOP=[
   {id:"bigtoy",  icon:"🎮",name:"Big toy",                cost:500,desc:"A big special toy — save up!"},
 ];
 const BON_THRESH=10,UD=5000,MAX_HIST=10;
-const CAT_STYLE={"🎨 Hobbies":{bg:"#EDE7F6",fg:"#4A148C"},"🏠 Chores":{bg:"#E8F5E9",fg:"#1B5E20"},"🍴 Self-care":{bg:"#FFF3E0",fg:"#BF360C"},"👨‍👩‍👧 Family":{bg:"#FCE4EC",fg:"#880E4F"}};
+const CAT_STYLE={"🎨 Hobbies":{bg:"#EDE7F6",fg:"#4A148C"},"🏠 Chores":{bg:"#E8F5E9",fg:"#1B5E20"},"🍴 Self-care":{bg:"#FFF3E0",fg:"#BF360C"},"👨‍👩‍👧 Family":{bg:"#FCE4EC",fg:"#880E4F"},"🌅 Morning":{bg:"#E0F2F1",fg:"#00695C"}};
 const PEN_CAT_STYLE={"🗣️ Communication":{bg:"#FFF3E0",fg:"#BF360C"},"💥 Behaviour":{bg:"#FFEBEE",fg:"#B71C1C"},"🚦 Safety":{bg:"#F3E5F5",fg:"#6A1B9A"},"🧠 Responsibility":{bg:"#E3F2FD",fg:"#0D47A1"}};
 
 let weekKey=isoStr(getThisMonday());
@@ -369,7 +375,7 @@ function rawPts(){let p=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.
 function penCnt(){return(wst.penalties||[]).length;}
 function starsRest(){return wst.starsRestored||0;}
 function effPts(){return Math.max(0,rawPts()-penCnt()+starsRest());}
-function bonEarned(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};BT.forEach(b=>{if(dm[b.id])t++;});}return t;}
+function bonEarned(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};BT.forEach(b=>{const v=dm[b.id];if(v)t+=(typeof v==='number'?v:1);});}return t;}
 function bonAvail(){return Math.max(0,bonEarned()-starsRest());}
 function allDone(){return effPts()>=TOTAL_REQ_PTS;}
 function baseU(){return allDone()?2:0;}
@@ -468,10 +474,14 @@ function rTaskSections(){
     container.appendChild(bar);
     const list=document.createElement("div");list.className="ios-list";
     tasks.forEach(task=>{
-      const done=!!dm[task.id];const row=document.createElement("div");
-      row.className="ios-row"+(done?" done":"");row.style.opacity=fut?"0.3":"1";
-      row.innerHTML=`<div class="biw" style="background:${task.bg};border:1.5px solid ${task.fg}33;"><span style="font-size:18px;">${task.icon}</span></div><div class="rt"><div class="rt-t">${task.name}</div><div class="rt-s">${task.sub}</div></div><div class="rr"><span style="font-size:13px;">⭐</span><div class="cc${done?" cb":""}">${done?"★":""}</div></div>`;
-      if(!fut)row.onclick=()=>togBonus(task,di);list.appendChild(row);
+      const cnt=getBonusCnt(dm,task.id);const row=document.createElement("div");
+      row.className="ios-row"+(cnt>0?" done":"");row.style.opacity=fut?"0.3":"1";
+      if(!fut){
+        row.innerHTML=`<div class="biw" style="background:${task.bg};border:1.5px solid ${task.fg}33;"><span style="font-size:18px;">${task.icon}</span></div><div class="rt"><div class="rt-t">${task.name}</div><div class="rt-s">${task.sub}</div></div><div class="rr" style="gap:4px;">${cnt>0?`<button onclick="event.stopPropagation();decBonus('${task.id}','${di}')" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--border);background:#f5f5f5;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--sub);">−</button>`:''}<span style="font-size:12px;font-weight:800;color:${cnt>0?'var(--yellow-d)':'var(--sub)'};min-width:18px;text-align:center;">${cnt>0?cnt+'⭐':'⭐'}</span><button onclick="event.stopPropagation();incBonus('${task.id}','${di}')" style="width:26px;height:26px;border-radius:50%;border:2px solid ${task.fg}44;background:${task.bg};font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:800;color:${task.fg};">+</button></div>`;
+      } else {
+        row.innerHTML=`<div class="biw" style="background:${task.bg};border:1.5px solid ${task.fg}33;"><span style="font-size:18px;">${task.icon}</span></div><div class="rt"><div class="rt-t">${task.name}</div><div class="rt-s">${task.sub}</div></div><div class="rr"><span style="font-size:12px;color:var(--sub);">⭐</span></div>`;
+      }
+      list.appendChild(row);
     });
     container.appendChild(list);
   });
@@ -629,10 +639,18 @@ function togReq(task,di){
   if(done)delete wst.dt[di][task.id];else wst.dt[di][task.id]=true;
   sv();render();toast(done?"Unmarked":"✓ +1 pt!");
 }
-function togBonus(task,di){
-  if(!wst.dt[di])wst.dt[di]={};const done=!!wst.dt[di][task.id];
-  if(done)delete wst.dt[di][task.id];else wst.dt[di][task.id]=true;
-  sv();render();toast(done?"Unmarked":"⭐ Star earned!");
+function getBonusCnt(dm,id){const v=dm[id];return typeof v==='number'?v:(v?1:0);}
+function incBonus(id,di){
+  if(!wst.dt[di])wst.dt[di]={};
+  const cur=getBonusCnt(wst.dt[di],id);
+  wst.dt[di][id]=cur+1;
+  sv();render();toast("⭐ Star earned! ×"+(cur+1));
+}
+function decBonus(id,di){
+  if(!wst.dt[di])wst.dt[di]={};
+  const cur=getBonusCnt(wst.dt[di],id);
+  if(cur<=1)delete wst.dt[di][id];else wst.dt[di][id]=cur-1;
+  sv();render();toast(cur<=1?"Removed":"⭐ ×"+(cur-1));
 }
 function applyPen(p){
   dU();snap=JSON.parse(JSON.stringify({w:wst,g:gst}));
