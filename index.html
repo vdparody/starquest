@@ -201,6 +201,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
 .sync-ind.busy{background:#FFD700;animation:spulse 1s infinite;}
 .sync-ind.err{background:#f44336;}
 @keyframes spulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.gacha-machine{background:linear-gradient(135deg,#7B1FA2,#9C27B0);border-radius:20px;padding:20px;margin-bottom:14px;text-align:center;box-shadow:0 4px 0 #4A148C;position:relative;overflow:hidden;}
+.gacha-big{font-size:52px;line-height:1;}
+.gacha-label{font-size:13px;color:rgba(255,255,255,.85);margin-top:4px;font-weight:600;}
+.gacha-cost{font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;}
+.gacha-btns{display:flex;gap:8px;margin-top:14px;}
+.gacha-btn{flex:1;padding:12px 8px;border-radius:14px;font-size:13px;font-weight:800;border:none;cursor:pointer;text-align:center;line-height:1.4;}
+.gacha-btn.tok{background:#FFD700;color:#1a237e;box-shadow:0 2px 0 #F57F17;}
+.gacha-btn.star{background:#fff;color:#7B1FA2;box-shadow:0 2px 0 #CE93D8;}
+.gacha-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;}
+.gacha-btn:active:not(:disabled){transform:translateY(2px);box-shadow:none;}
+.gacha-reveal{background:var(--card);border-radius:20px;padding:24px 16px;margin-bottom:14px;text-align:center;border:3px solid;animation:gReveal .5s ease-out;}
+.gacha-reveal .tier-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:3px 12px;border-radius:20px;display:inline-block;margin-bottom:8px;}
+.gacha-reveal .prize-icon{font-size:48px;margin:8px 0;}
+.gacha-reveal .prize-name{font-size:16px;font-weight:800;color:var(--text);}
+.gacha-reveal .prize-dismiss{font-size:11px;color:var(--sub);margin-top:8px;cursor:pointer;font-weight:600;}
+@keyframes gReveal{0%{transform:scale(.3) rotate(-10deg);opacity:0;}50%{transform:scale(1.1) rotate(2deg);}100%{transform:scale(1) rotate(0);opacity:1;}}
+.gacha-log-item{display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--card);border-radius:12px;margin-bottom:6px;border:2px solid var(--border);}
+.tier-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.ef-select{flex:1;min-width:0;padding:7px 10px;border-radius:10px;border:2px solid var(--border);font-size:13px;font-family:inherit;color:var(--text);background:#fff;-webkit-appearance:none;}
+.ef-select:focus{outline:none;border-color:var(--blue);}
 </style>
 </head>
 <body>
@@ -252,11 +272,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
       <div class="sec-label">🛍️ Token Shop</div>
       <div id="shop-items"></div><div id="shop-hist"></div>
     </div>
+    <div id="s-gacha" class="section">
+      <div style="height:10px;"></div>
+      <div id="gacha-machine-el"></div>
+      <div id="gacha-result"></div>
+      <div id="gacha-log-el"></div>
+    </div>
   </div>
   <div class="tab-bar" id="tb">
     <button class="tab-item active" onclick="showTab('home',this)"><span class="tab-icon-wrap">🏠</span><span class="tab-label">Home</span></button>
     <button class="tab-item" onclick="showTab('sunday',this)"><span class="tab-icon-wrap">🎁</span><span class="tab-label">Prize</span></button>
-    <button class="tab-item" onclick="showTab('shop',this)"><span class="tab-icon-wrap">🟡</span><span class="tab-label">Token Shop</span></button>
+    <button class="tab-item" onclick="showTab('shop',this)"><span class="tab-icon-wrap">🟡</span><span class="tab-label">Shop</span></button>
+    <button class="tab-item" onclick="showTab('gacha',this)"><span class="tab-icon-wrap">🎰</span><span class="tab-label">Gacha</span></button>
   </div>
   <div class="modal-overlay" id="settModal">
     <div class="modal-sheet">
@@ -345,15 +372,31 @@ const DEFAULT_SHOP=[
   {id:"choc",    icon:"🍫",name:"Chocolate",              cost:200,desc:"A bar of your choice"},
   {id:"bigtoy",  icon:"🎮",name:"Big toy",                cost:500,desc:"A big special toy — save up!"},
 ];
+function allBT(){return BT.concat(gst&&gst.customTasks?gst.customTasks:[]);}
+const GACHA_TOKEN_COST=10,GACHA_STAR_COST=5;
+const TIER_INFO={common:{color:"#9E9E9E",label:"Common"},uncommon:{color:"#4CAF50",label:"Uncommon"},rare:{color:"#2196F3",label:"Rare"},epic:{color:"#9C27B0",label:"Epic"}};
+const TIERS=[{name:"common",weight:60},{name:"uncommon",weight:25},{name:"rare",weight:12},{name:"epic",weight:3}];
+const DEFAULT_GACHA=[
+  {id:"g1",icon:"🍬",name:"Candy",tier:"common"},
+  {id:"g2",icon:"🖍️",name:"Colored pencil",tier:"common"},
+  {id:"g3",icon:"🏷️",name:"Sticker pack",tier:"common"},
+  {id:"g4",icon:"🍪",name:"Cookie",tier:"common"},
+  {id:"g5",icon:"🧩",name:"Mini puzzle",tier:"uncommon"},
+  {id:"g6",icon:"📓",name:"Cool notebook",tier:"uncommon"},
+  {id:"g7",icon:"🎲",name:"Dice game",tier:"rare"},
+  {id:"g8",icon:"🧸",name:"Plush keychain",tier:"rare"},
+  {id:"g9",icon:"🎮",name:"30 min extra screen time",tier:"epic"},
+  {id:"g10",icon:"🎁",name:"Special surprise!",tier:"epic"},
+];
 const BON_THRESH=10,UD=5000,MAX_HIST=10;
 const CAT_STYLE={"🎨 Hobbies":{bg:"#EDE7F6",fg:"#4A148C"},"🏠 Chores":{bg:"#E8F5E9",fg:"#1B5E20"},"🍴 Self-care":{bg:"#FFF3E0",fg:"#BF360C"},"👨‍👩‍👧 Family":{bg:"#FCE4EC",fg:"#880E4F"},"🌅 Morning":{bg:"#E0F2F1",fg:"#00695C"}};
 const PEN_CAT_STYLE={"🗣️ Communication":{bg:"#FFF3E0",fg:"#BF360C"},"💥 Behaviour":{bg:"#FFEBEE",fg:"#B71C1C"},"🚦 Safety":{bg:"#F3E5F5",fg:"#6A1B9A"},"🧠 Responsibility":{bg:"#E3F2FD",fg:"#0D47A1"}};
 
 let weekKey=isoStr(getThisMonday());
 let todayOffset=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
-let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false;
+let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,gpEditId=null,showGpAdd=false;
 function defW(){return{dt:{},penalties:[],starsRestored:0,log:[],spent:[],starChoice:null};}
-function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(DEFAULT_SHOP))};}
+function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(DEFAULT_SHOP)),customTasks:[],gachaLog:[],gachaPrizes:JSON.parse(JSON.stringify(DEFAULT_GACHA))};}
 let wst,gst;
 
 function dayIso(o){return addD(weekKey,o);}
@@ -367,6 +410,9 @@ function load(){
   if(!gst.shopItems||!gst.shopItems.length)gst.shopItems=JSON.parse(JSON.stringify(DEFAULT_SHOP));
   if(!Array.isArray(wst.penalties))wst.penalties=[];
   if(typeof gst.tokens!=="number")gst.tokens=0;
+  if(!gst.customTasks)gst.customTasks=[];
+  if(!gst.gachaLog)gst.gachaLog=[];
+  if(!gst.gachaPrizes||!gst.gachaPrizes.length)gst.gachaPrizes=JSON.parse(JSON.stringify(DEFAULT_GACHA));
 }
 function sv(){
   try{localStorage.setItem("sq_w_"+weekKey,JSON.stringify(wst));}catch{}
@@ -378,8 +424,8 @@ function rawPts(){let p=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.
 function penCnt(){return(wst.penalties||[]).length;}
 function starsRest(){return wst.starsRestored||0;}
 function effPts(){return Math.max(0,rawPts()-penCnt()+starsRest());}
-function bonEarned(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};BT.forEach(b=>{const v=dm[b.id];if(v)t+=(typeof v==='number'?v:1);});}return t;}
-function bonAvail(){return Math.max(0,bonEarned()-starsRest());}
+function bonEarned(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};allBT().forEach(b=>{const v=dm[b.id];if(v)t+=(typeof v==='number'?v:1);});}return t;}
+function bonAvail(){return Math.max(0,bonEarned()-starsRest()-(wst.starsSpentGacha||0));}
 function allDone(){return effPts()>=TOTAL_REQ_PTS;}
 function baseU(){return allDone()?2:0;}
 function bonU(){return wst.starChoice==="screen"?1:0;}
@@ -420,7 +466,7 @@ function render(){
     d.innerHTML=`<div class="unit-emoji">${c.e?(c.b?"⭐":"🏆"):c.p?"⏳":"🔒"}</div><div class="unit-label">${c.l}<br>${c.e?"Earned":c.p?"Decide Sun":"Locked"}</div>`;
     urEl.appendChild(d);
   });
-  rDays();rDaySummary();rTaskSections();rPenLog();rSunday();rShop();
+  rDays();rDaySummary();rTaskSections();rPenLog();rSunday();rShop();rGacha();
 }
 
 function rDays(){
@@ -469,7 +515,7 @@ function rTaskSections(){
     if(!fut)row.onclick=()=>togReq(task,di);reqList.appendChild(row);
   });
   container.appendChild(reqList);
-  const btCats={};BT.forEach(t=>{if(!btCats[t.cat])btCats[t.cat]=[];btCats[t.cat].push(t);});
+  const btCats={};allBT().forEach(t=>{if(!btCats[t.cat])btCats[t.cat]=[];btCats[t.cat].push(t);});
   Object.entries(btCats).forEach(([cat,tasks])=>{
     const cs=CAT_STYLE[cat]||{bg:"#F5F5F5",fg:"#333"};
     const bar=document.createElement("div");bar.className="cat-bar";
@@ -578,8 +624,67 @@ function rShop(){
   }
 }
 
+// ── Gacha ──────────────────────────────
+function rollGacha(){
+  const pool=gst.gachaPrizes||DEFAULT_GACHA;
+  const roll=Math.random()*100;let cum=0,picked=TIERS[0];
+  for(const t of TIERS){cum+=t.weight;if(roll<cum){picked=t;break;}}
+  const inTier=pool.filter(p=>p.tier===picked.name);
+  if(!inTier.length){const any=pool;return{...any[Math.floor(Math.random()*any.length)],tierData:TIER_INFO[any[0].tier]};}
+  const prize=inTier[Math.floor(Math.random()*inTier.length)];
+  return{...prize,tierData:TIER_INFO[picked.name]};
+}
+let gachaRevealing=false;
+function doGachaPull(currency){
+  if(gachaRevealing)return;
+  if(currency==='token'){
+    if(gst.tokens<GACHA_TOKEN_COST){toast('Not enough tokens!');return;}
+    gst.tokens-=GACHA_TOKEN_COST;
+  } else {
+    if(bonAvail()<GACHA_STAR_COST){toast('Not enough stars!');return;}
+    wst.starsSpentGacha=(wst.starsSpentGacha||0)+GACHA_STAR_COST;
+  }
+  const prize=rollGacha();
+  if(!gst.gachaLog)gst.gachaLog=[];
+  gst.gachaLog.push({icon:prize.icon,name:prize.name,tier:prize.tier,cost:currency==='token'?GACHA_TOKEN_COST:GACHA_STAR_COST,currency,date:dayIso(todayOffset)});
+  if(prize.tokenReward)gst.tokens+=prize.tokenReward;
+  sv();
+  // Show reveal
+  gachaRevealing=true;
+  const tc=prize.tierData||TIER_INFO[prize.tier]||TIER_INFO.common;
+  const rd=document.getElementById('gacha-result');
+  rd.innerHTML=`<div class="gacha-reveal" style="border-color:${tc.color};"><div class="tier-label" style="background:${tc.color};color:#fff;">${tc.label}</div><div class="prize-icon">${prize.icon}</div><div class="prize-name">${prize.name}</div><div class="prize-dismiss" onclick="dismissGacha()">Tap to continue</div></div>`;
+  setTimeout(()=>{gachaRevealing=false;render();},500);
+}
+function dismissGacha(){document.getElementById('gacha-result').innerHTML='';gachaRevealing=false;}
+function rGacha(){
+  const me=document.getElementById('gacha-machine-el');if(!me)return;
+  const tokOk=gst.tokens>=GACHA_TOKEN_COST,starOk=bonAvail()>=GACHA_STAR_COST;
+  me.innerHTML=`<div class="gacha-machine"><div class="gacha-big">🎰</div><div style="font-size:22px;font-weight:800;color:#FFD700;margin-top:4px;">Gacha Machine</div><div class="gacha-label">Try your luck! Win prizes!</div><div class="gacha-cost">Cost: ${GACHA_TOKEN_COST} 🟡 tokens or ${GACHA_STAR_COST} ⭐ stars</div><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,.9);font-weight:700;">🟡 ${gst.tokens} tokens · ⭐ ${bonAvail()} stars</div><div class="gacha-btns"><button class="gacha-btn tok" onclick="doGachaPull('token')" ${tokOk?'':'disabled'}>🟡 Pull (${GACHA_TOKEN_COST})</button><button class="gacha-btn star" onclick="doGachaPull('star')" ${starOk?'':'disabled'}>⭐ Pull (${GACHA_STAR_COST})</button></div></div>`;
+  // Prize pool preview
+  const pool=gst.gachaPrizes||DEFAULT_GACHA;
+  let poolH='<div class="sec-label" style="margin-top:14px;">🎁 Prize Pool</div>';
+  ['epic','rare','uncommon','common'].forEach(tier=>{
+    const ti=TIER_INFO[tier];const items=pool.filter(p=>p.tier===tier);
+    if(!items.length)return;
+    poolH+=`<div style="font-size:11px;font-weight:800;color:${ti.color};padding:4px 4px 2px;margin-top:4px;">${ti.label}</div>`;
+    items.forEach(p=>{poolH+=`<div class="gacha-log-item"><span class="tier-dot" style="background:${ti.color};"></span><span style="font-size:16px;">${p.icon}</span><span style="flex:1;font-size:13px;font-weight:600;color:var(--text);">${p.name}</span></div>`;});
+  });
+  me.innerHTML+=poolH;
+  // Pull history
+  const le=document.getElementById('gacha-log-el');if(!le)return;
+  const log=gst.gachaLog||[];
+  if(!log.length){le.innerHTML='';return;}
+  let h='<div class="sec-label" style="margin-top:14px;">📋 Pull History</div>';
+  [...log].reverse().slice(0,15).forEach(e=>{
+    const ti=TIER_INFO[e.tier]||TIER_INFO.common;
+    h+=`<div class="gacha-log-item"><span class="tier-dot" style="background:${ti.color};"></span><span style="font-size:16px;">${e.icon}</span><span style="flex:1;font-size:13px;font-weight:600;color:var(--text);">${e.name}</span><span style="font-size:11px;color:var(--sub);font-weight:600;">−${e.cost}${e.currency==='token'?'🟡':'⭐'}</span></div>`;
+  });
+  le.innerHTML=h;
+}
+
 // Settings
-function openSettings(){editId=null;showAddForm=false;rSettBody();document.getElementById("settModal").classList.add("show");pullAndRender();}
+function openSettings(){editId=null;showAddForm=false;btEditId=null;showBtAdd=false;gpEditId=null;showGpAdd=false;rSettBody();document.getElementById("settModal").classList.add("show");pullAndRender();}
 function closeSettings(){document.getElementById("settModal").classList.remove("show");}
 function rSettBody(){
   const body=document.getElementById("sett-body");body.innerHTML="";
@@ -597,6 +702,34 @@ function rSettBody(){
     const wrap=document.createElement("div");wrap.className="sett-item";
     let html=`<div class="sett-row"><span class="sett-emoji">${item.icon}</span><div class="sett-info"><div class="sett-name">${item.name}</div><div class="sett-cost">🟡 ${item.cost} · ${item.desc}</div></div><div class="sett-btns"><button class="edit-btn" onclick="toggleEdit('${item.id}')">Edit</button><button class="sett-del-btn" onclick="deleteItem('${item.id}')">Delete</button></div></div>`;
     if(editId===item.id)html+=`<div class="edit-form-inner"><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="ei-icon-${item.id}" value="${item.icon}" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="ei-name-${item.id}" value="${item.name}"></div><div class="ef-row"><span class="ef-label">Tokens</span><input class="ef-input" id="ei-cost-${item.id}" type="number" min="1" value="${item.cost}" style="width:80px;"></div><div class="ef-row"><span class="ef-label">Desc</span><input class="ef-input" id="ei-desc-${item.id}" value="${item.desc}"></div><div class="ef-actions"><button class="save-btn" onclick="saveEdit('${item.id}')">Save</button><button class="cancel-btn" onclick="cancelEdit()">Cancel</button></div></div>`;
+    wrap.innerHTML=html;body.appendChild(wrap);
+  });
+  // ── Bonus Tasks section ──
+  const cats=Object.keys(CAT_STYLE);
+  body.innerHTML+=`<div class="sett-section-label">⭐ Bonus Tasks</div>`;
+  const btAddSec=document.createElement("div");btAddSec.style.cssText="padding:0 14px 0;";
+  if(!showBtAdd){btAddSec.innerHTML=`<button class="add-btn" onclick="showBtAdd=true;rSettBody()">＋ Add new task</button>`;}
+  else{btAddSec.innerHTML=`<div class="add-form"><div class="add-form-title">✚ New bonus task</div><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="bt-icon" placeholder="🎯" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="bt-name" placeholder="Task name"></div><div class="ef-row"><span class="ef-label">Category</span><select class="ef-select" id="bt-cat">${cats.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div><div class="ef-row"><span class="ef-label">Detail</span><input class="ef-input" id="bt-sub" placeholder="Short description"></div><div class="ef-actions"><button class="save-btn" onclick="addBonusTask()">Add task</button><button class="cancel-btn" onclick="showBtAdd=false;rSettBody()">Cancel</button></div></div>`;}
+  body.appendChild(btAddSec);
+  (gst.customTasks||[]).forEach(task=>{
+    const cs=CAT_STYLE[task.cat]||{bg:"#F5F5F5",fg:"#333"};
+    const wrap=document.createElement("div");wrap.className="sett-item";
+    let html=`<div class="sett-row"><span class="sett-emoji">${task.icon}</span><div class="sett-info"><div class="sett-name">${task.name}</div><div class="sett-cost">${task.cat} · ${task.sub||''}</div></div><div class="sett-btns"><button class="edit-btn" onclick="btEditId=btEditId==='${task.id}'?null:'${task.id}';rSettBody()">Edit</button><button class="sett-del-btn" onclick="deleteBonusTask('${task.id}')">Delete</button></div></div>`;
+    if(btEditId===task.id)html+=`<div class="edit-form-inner"><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="bte-icon-${task.id}" value="${task.icon}" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="bte-name-${task.id}" value="${task.name}"></div><div class="ef-row"><span class="ef-label">Category</span><select class="ef-select" id="bte-cat-${task.id}">${cats.map(c=>`<option value="${c}"${c===task.cat?' selected':''}>${c}</option>`).join('')}</select></div><div class="ef-row"><span class="ef-label">Detail</span><input class="ef-input" id="bte-sub-${task.id}" value="${task.sub||''}"></div><div class="ef-actions"><button class="save-btn" onclick="saveBonusTaskEdit('${task.id}')">Save</button><button class="cancel-btn" onclick="btEditId=null;rSettBody()">Cancel</button></div></div>`;
+    wrap.innerHTML=html;body.appendChild(wrap);
+  });
+  // ── Gacha Prizes section ──
+  body.innerHTML+=`<div class="sett-section-label">🎰 Gacha Prizes</div>`;
+  const gpAddSec=document.createElement("div");gpAddSec.style.cssText="padding:0 14px 0;";
+  const tierOpts=Object.entries(TIER_INFO).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  if(!showGpAdd){gpAddSec.innerHTML=`<button class="add-btn" onclick="showGpAdd=true;rSettBody()">＋ Add new prize</button>`;}
+  else{gpAddSec.innerHTML=`<div class="add-form"><div class="add-form-title">✚ New gacha prize</div><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="gp-icon" placeholder="🎁" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="gp-name" placeholder="Prize name"></div><div class="ef-row"><span class="ef-label">Tier</span><select class="ef-select" id="gp-tier">${tierOpts}</select></div><div class="ef-actions"><button class="save-btn" onclick="addGachaPrize()">Add prize</button><button class="cancel-btn" onclick="showGpAdd=false;rSettBody()">Cancel</button></div></div>`;}
+  body.appendChild(gpAddSec);
+  (gst.gachaPrizes||[]).forEach(prize=>{
+    const ti=TIER_INFO[prize.tier]||TIER_INFO.common;
+    const wrap=document.createElement("div");wrap.className="sett-item";
+    let html=`<div class="sett-row"><span class="sett-emoji">${prize.icon}</span><div class="sett-info"><div class="sett-name">${prize.name}</div><div class="sett-cost" style="color:${ti.color};">${ti.label}</div></div><div class="sett-btns"><button class="edit-btn" onclick="gpEditId=gpEditId==='${prize.id}'?null:'${prize.id}';rSettBody()">Edit</button><button class="sett-del-btn" onclick="deleteGachaPrize('${prize.id}')">Delete</button></div></div>`;
+    if(gpEditId===prize.id)html+=`<div class="edit-form-inner"><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="gpe-icon-${prize.id}" value="${prize.icon}" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="gpe-name-${prize.id}" value="${prize.name}"></div><div class="ef-row"><span class="ef-label">Tier</span><select class="ef-select" id="gpe-tier-${prize.id}">${Object.entries(TIER_INFO).map(([k,v])=>`<option value="${k}"${k===prize.tier?' selected':''}>${v.label}</option>`).join('')}</select></div><div class="ef-actions"><button class="save-btn" onclick="saveGachaPrizeEdit('${prize.id}')">Save</button><button class="cancel-btn" onclick="gpEditId=null;rSettBody()">Cancel</button></div></div>`;
     wrap.innerHTML=html;body.appendChild(wrap);
   });
 }
@@ -634,6 +767,44 @@ function saveEdit(id){
   item.cost=Math.max(1,parseInt(document.getElementById("ei-cost-"+id).value)||item.cost);
   item.desc=document.getElementById("ei-desc-"+id).value.trim()||item.desc;
   editId=null;sv();rSettBody();rShop();toast("Saved ✓");
+}
+// Bonus task CRUD
+function addBonusTask(){
+  const icon=document.getElementById("bt-icon").value.trim()||"🎯";
+  const name=document.getElementById("bt-name").value.trim();
+  const cat=document.getElementById("bt-cat").value;
+  const sub=document.getElementById("bt-sub").value.trim();
+  if(!name){toast("Please enter a name");return;}
+  const cs=CAT_STYLE[cat]||{bg:"#F5F5F5",fg:"#333"};
+  gst.customTasks.push({id:"ct_"+Date.now(),icon,bg:cs.bg,fg:cs.fg,name,cat,sub});
+  showBtAdd=false;sv();rSettBody();render();toast("Task added ✓");
+}
+function deleteBonusTask(id){gst.customTasks=gst.customTasks.filter(t=>t.id!==id);if(btEditId===id)btEditId=null;sv();rSettBody();render();toast("Deleted ✓");}
+function saveBonusTaskEdit(id){
+  const t=gst.customTasks.find(t=>t.id===id);if(!t)return;
+  t.icon=document.getElementById("bte-icon-"+id).value.trim()||t.icon;
+  t.name=document.getElementById("bte-name-"+id).value.trim()||t.name;
+  t.cat=document.getElementById("bte-cat-"+id).value||t.cat;
+  t.sub=document.getElementById("bte-sub-"+id).value.trim();
+  const cs=CAT_STYLE[t.cat]||{bg:"#F5F5F5",fg:"#333"};t.bg=cs.bg;t.fg=cs.fg;
+  btEditId=null;sv();rSettBody();render();toast("Saved ✓");
+}
+// Gacha prize CRUD
+function addGachaPrize(){
+  const icon=document.getElementById("gp-icon").value.trim()||"🎁";
+  const name=document.getElementById("gp-name").value.trim();
+  const tier=document.getElementById("gp-tier").value;
+  if(!name){toast("Please enter a name");return;}
+  gst.gachaPrizes.push({id:"gp_"+Date.now(),icon,name,tier});
+  showGpAdd=false;sv();rSettBody();rGacha();toast("Prize added ✓");
+}
+function deleteGachaPrize(id){gst.gachaPrizes=gst.gachaPrizes.filter(p=>p.id!==id);if(gpEditId===id)gpEditId=null;sv();rSettBody();rGacha();toast("Deleted ✓");}
+function saveGachaPrizeEdit(id){
+  const p=gst.gachaPrizes.find(p=>p.id===id);if(!p)return;
+  p.icon=document.getElementById("gpe-icon-"+id).value.trim()||p.icon;
+  p.name=document.getElementById("gpe-name-"+id).value.trim()||p.name;
+  p.tier=document.getElementById("gpe-tier-"+id).value||p.tier;
+  gpEditId=null;sv();rSettBody();rGacha();toast("Saved ✓");
 }
 
 // Actions
