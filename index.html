@@ -373,6 +373,7 @@ const DEFAULT_SHOP=[
   {id:"bigtoy",  icon:"🎮",name:"Big toy",                cost:500,desc:"A big special toy — save up!"},
 ];
 function allBT(){return BT.concat(gst&&gst.customTasks?gst.customTasks:[]);}
+function allPen(){return PEN_LIST.concat(gst&&gst.customPenalties?gst.customPenalties:[]);}
 const GACHA_TOKEN_COST=10,GACHA_STAR_COST=5;
 const TIER_INFO={common:{color:"#9E9E9E",label:"Common"},uncommon:{color:"#4CAF50",label:"Uncommon"},rare:{color:"#2196F3",label:"Rare"},epic:{color:"#9C27B0",label:"Epic"}};
 const TIERS=[{name:"common",weight:60},{name:"uncommon",weight:25},{name:"rare",weight:12},{name:"epic",weight:3}];
@@ -394,9 +395,9 @@ const PEN_CAT_STYLE={"🗣️ Communication":{bg:"#FFF3E0",fg:"#BF360C"},"💥 B
 
 let weekKey=isoStr(getThisMonday());
 let todayOffset=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
-let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,gpEditId=null,showGpAdd=false;
+let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,penEditId=null,showPenAdd=false,gpEditId=null,showGpAdd=false;
 function defW(){return{dt:{},penalties:[],starsRestored:0,log:[],spent:[],starChoice:null};}
-function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(DEFAULT_SHOP)),customTasks:[],gachaLog:[],gachaPrizes:JSON.parse(JSON.stringify(DEFAULT_GACHA))};}
+function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(DEFAULT_SHOP)),customTasks:[],customPenalties:[],gachaLog:[],gachaPrizes:JSON.parse(JSON.stringify(DEFAULT_GACHA))};}
 let wst,gst;
 
 function dayIso(o){return addD(weekKey,o);}
@@ -411,6 +412,7 @@ function load(){
   if(!Array.isArray(wst.penalties))wst.penalties=[];
   if(typeof gst.tokens!=="number")gst.tokens=0;
   if(!gst.customTasks)gst.customTasks=[];
+  if(!gst.customPenalties)gst.customPenalties=[];
   if(!gst.gachaLog)gst.gachaLog=[];
   if(!gst.gachaPrizes||!gst.gachaPrizes.length)gst.gachaPrizes=JSON.parse(JSON.stringify(DEFAULT_GACHA));
 }
@@ -537,7 +539,7 @@ function rTaskSections(){
   const penLbl=document.createElement("div");penLbl.className="sec-label";penLbl.style.marginTop="4px";
   penLbl.innerHTML=`<span>⚠️ Penalties</span><span style="font-size:10px;font-weight:700;background:var(--red-l);color:var(--red);padding:2px 9px;border-radius:20px;">−1 pt each</span>`;
   container.appendChild(penLbl);
-  const penCats={};PEN_LIST.forEach(p=>{if(!penCats[p.cat])penCats[p.cat]=[];penCats[p.cat].push(p);});
+  const penCats={};allPen().forEach(p=>{if(!penCats[p.cat])penCats[p.cat]=[];penCats[p.cat].push(p);});
   Object.entries(penCats).forEach(([cat,pens])=>{
     const cs=PEN_CAT_STYLE[cat]||{bg:"#FFEBEE",fg:"#B71C1C"};
     const bar=document.createElement("div");bar.className="cat-bar";
@@ -684,7 +686,7 @@ function rGacha(){
 }
 
 // Settings
-function openSettings(){editId=null;showAddForm=false;btEditId=null;showBtAdd=false;gpEditId=null;showGpAdd=false;rSettBody();document.getElementById("settModal").classList.add("show");pullAndRender();}
+function openSettings(){editId=null;showAddForm=false;btEditId=null;showBtAdd=false;penEditId=null;showPenAdd=false;gpEditId=null;showGpAdd=false;rSettBody();document.getElementById("settModal").classList.add("show");pullAndRender();}
 function closeSettings(){document.getElementById("settModal").classList.remove("show");}
 function rSettBody(){
   const body=document.getElementById("sett-body");body.innerHTML="";
@@ -716,6 +718,20 @@ function rSettBody(){
     const wrap=document.createElement("div");wrap.className="sett-item";
     let html=`<div class="sett-row"><span class="sett-emoji">${task.icon}</span><div class="sett-info"><div class="sett-name">${task.name}</div><div class="sett-cost">${task.cat} · ${task.sub||''}</div></div><div class="sett-btns"><button class="edit-btn" onclick="btEditId=btEditId==='${task.id}'?null:'${task.id}';rSettBody()">Edit</button><button class="sett-del-btn" onclick="deleteBonusTask('${task.id}')">Delete</button></div></div>`;
     if(btEditId===task.id)html+=`<div class="edit-form-inner"><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="bte-icon-${task.id}" value="${task.icon}" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="bte-name-${task.id}" value="${task.name}"></div><div class="ef-row"><span class="ef-label">Category</span><select class="ef-select" id="bte-cat-${task.id}">${cats.map(c=>`<option value="${c}"${c===task.cat?' selected':''}>${c}</option>`).join('')}</select></div><div class="ef-row"><span class="ef-label">Detail</span><input class="ef-input" id="bte-sub-${task.id}" value="${task.sub||''}"></div><div class="ef-actions"><button class="save-btn" onclick="saveBonusTaskEdit('${task.id}')">Save</button><button class="cancel-btn" onclick="btEditId=null;rSettBody()">Cancel</button></div></div>`;
+    wrap.innerHTML=html;body.appendChild(wrap);
+  });
+  // ── Penalties section ──
+  const penCats2=Object.keys(PEN_CAT_STYLE);
+  body.innerHTML+=`<div class="sett-section-label">⚠️ Penalties</div>`;
+  const penAddSec=document.createElement("div");penAddSec.style.cssText="padding:0 14px 0;";
+  if(!showPenAdd){penAddSec.innerHTML=`<button class="add-btn" onclick="showPenAdd=true;rSettBody()">＋ Add new penalty</button>`;}
+  else{penAddSec.innerHTML=`<div class="add-form"><div class="add-form-title">✚ New penalty</div><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="pen-icon" placeholder="⚠️" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="pen-name" placeholder="Penalty name"></div><div class="ef-row"><span class="ef-label">Category</span><select class="ef-select" id="pen-cat">${penCats2.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div><div class="ef-actions"><button class="save-btn" onclick="addCustomPenalty()">Add penalty</button><button class="cancel-btn" onclick="showPenAdd=false;rSettBody()">Cancel</button></div></div>`;}
+  body.appendChild(penAddSec);
+  (gst.customPenalties||[]).forEach(pen=>{
+    const cs=PEN_CAT_STYLE[pen.cat]||{bg:"#FFEBEE",fg:"#B71C1C"};
+    const wrap=document.createElement("div");wrap.className="sett-item";
+    let html=`<div class="sett-row"><span class="sett-emoji">${pen.icon}</span><div class="sett-info"><div class="sett-name">${pen.name}</div><div class="sett-cost" style="color:${cs.fg};">${pen.cat}</div></div><div class="sett-btns"><button class="edit-btn" onclick="penEditId=penEditId==='${pen.id}'?null:'${pen.id}';rSettBody()">Edit</button><button class="sett-del-btn" onclick="deleteCustomPenalty('${pen.id}')">Delete</button></div></div>`;
+    if(penEditId===pen.id)html+=`<div class="edit-form-inner"><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="pene-icon-${pen.id}" value="${pen.icon}" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="pene-name-${pen.id}" value="${pen.name}"></div><div class="ef-row"><span class="ef-label">Category</span><select class="ef-select" id="pene-cat-${pen.id}">${penCats2.map(c=>`<option value="${c}"${c===pen.cat?' selected':''}>${c}</option>`).join('')}</select></div><div class="ef-actions"><button class="save-btn" onclick="saveCustomPenaltyEdit('${pen.id}')">Save</button><button class="cancel-btn" onclick="penEditId=null;rSettBody()">Cancel</button></div></div>`;
     wrap.innerHTML=html;body.appendChild(wrap);
   });
   // ── Gacha Prizes section ──
@@ -788,6 +804,23 @@ function saveBonusTaskEdit(id){
   t.sub=document.getElementById("bte-sub-"+id).value.trim();
   const cs=CAT_STYLE[t.cat]||{bg:"#F5F5F5",fg:"#333"};t.bg=cs.bg;t.fg=cs.fg;
   btEditId=null;sv();rSettBody();render();toast("Saved ✓");
+}
+// Custom penalty CRUD
+function addCustomPenalty(){
+  const icon=document.getElementById("pen-icon").value.trim()||"⚠️";
+  const name=document.getElementById("pen-name").value.trim();
+  const cat=document.getElementById("pen-cat").value;
+  if(!name){toast("Please enter a name");return;}
+  gst.customPenalties.push({id:"cp_"+Date.now(),icon,name,cat});
+  showPenAdd=false;sv();rSettBody();render();toast("Penalty added ✓");
+}
+function deleteCustomPenalty(id){gst.customPenalties=gst.customPenalties.filter(p=>p.id!==id);if(penEditId===id)penEditId=null;sv();rSettBody();render();toast("Deleted ✓");}
+function saveCustomPenaltyEdit(id){
+  const p=gst.customPenalties.find(p=>p.id===id);if(!p)return;
+  p.icon=document.getElementById("pene-icon-"+id).value.trim()||p.icon;
+  p.name=document.getElementById("pene-name-"+id).value.trim()||p.name;
+  p.cat=document.getElementById("pene-cat-"+id).value||p.cat;
+  penEditId=null;sv();rSettBody();render();toast("Saved ✓");
 }
 // Gacha prize CRUD
 function addGachaPrize(){
