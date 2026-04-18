@@ -942,18 +942,19 @@ function toast(msg){
 
 // ── Cloud Sync via Google Sheets ─────────────
 const SYNC_URL='https://script.google.com/macros/s/AKfycbx8mHSdaRjRejLEAvbgr9vWzZBA8MxGZ7F8nUbsv_3UaS41O_YP6xmXszzy7WUC7bXzGA/exec';
-let syncStatus='ok',syncTimer=null,pushing=false;
+let syncStatus='ok',syncTimer=null,pushing=false,dirty=false;
 
 function updSyncDot(){
   const d=document.getElementById('syncDot');if(!d)return;
   d.className='sync-ind '+syncStatus;
 }
 function scheduleSync(){
-  clearTimeout(syncTimer);syncTimer=setTimeout(()=>cloudPush(),500);
+  dirty=true;
+  clearTimeout(syncTimer);syncTimer=setTimeout(()=>cloudPush(),300);
 }
 async function cloudPush(){
   if(pushing)return;
-  pushing=true;syncStatus='busy';updSyncDot();
+  pushing=true;dirty=false;syncStatus='busy';updSyncDot();
   const payload={};payload['w_'+weekKey]=wst;payload['global']=gst;
   try{
     const d=encodeURIComponent(JSON.stringify(payload));
@@ -964,8 +965,14 @@ async function cloudPush(){
     console.warn('Sync push err:',e);syncStatus='err';
   }
   pushing=false;updSyncDot();
+  // If more changes happened while pushing, push again
+  if(dirty)scheduleSync();
 }
 async function cloudPull(){
+  // Never pull while we have unpushed local changes — push first
+  if(dirty||pushing){
+    await cloudPush();
+  }
   syncStatus='busy';updSyncDot();
   try{
     const r=await fetch(SYNC_URL+'?action=read&t='+Date.now(),{redirect:'follow',cache:'no-store'});
