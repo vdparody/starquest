@@ -245,15 +245,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
         <div class="prog-row"><span class="prog-title">🌟 Bonus Stars</span><span class="prog-val" id="bpl">0</span></div>
         <div class="prog-track"><div class="prog-fill orange" id="bpb" style="width:0%"></div></div>
       </div>
-      <div class="stat-row">
-        <div class="stat-card"><div class="stat-val blue" id="sd">0</div><div class="stat-lbl">req pts</div></div>
-        <div class="stat-card"><div class="stat-val orange" id="ss">0</div><div class="stat-lbl">bonus ⭐</div></div>
-        <div class="stat-card"><div class="stat-val amber" id="stok">0</div><div class="stat-lbl">🟡 tokens</div></div>
-        <div class="stat-card tappable" onclick="openPenLog()"><div class="stat-val red" id="sp">−0</div><div class="stat-lbl">penalties</div><div class="stat-hint">tap to edit</div></div>
-      </div>
       <div class="day-scroller" id="ds"></div>
       <div id="dsb"></div>
       <div id="task-sections"></div>
+    </div>
+    <div id="s-profile" class="section">
+      <div style="height:10px;"></div>
+      <div id="prof-body"></div>
     </div>
     <div id="s-penlog" class="section">
       <div style="height:10px;"></div>
@@ -281,6 +279,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
   </div>
   <div class="tab-bar" id="tb">
     <button class="tab-item active" onclick="showTab('home',this)"><span class="tab-icon-wrap">🏠</span><span class="tab-label">Home</span></button>
+    <button class="tab-item" onclick="showTab('profile',this)"><span class="tab-icon-wrap">👤</span><span class="tab-label">Profile</span></button>
     <button class="tab-item" onclick="showTab('sunday',this)"><span class="tab-icon-wrap">🎁</span><span class="tab-label">Prize</span></button>
     <button class="tab-item" onclick="showTab('shop',this)"><span class="tab-icon-wrap">🟡</span><span class="tab-label">Shop</span></button>
     <button class="tab-item" onclick="showTab('gacha',this)"><span class="tab-icon-wrap">🎰</span><span class="tab-label">Gacha</span></button>
@@ -363,6 +362,8 @@ const EX=[
   {id:"pp",icon:"🐾",label:"1 Paw Patrol episode",sub:"~23 min"},
   {id:"mk",icon:"🏎️",label:"Mario Kart 4 races",  sub:"1 game · 4 races"},
 ];
+const DEFAULT_PRIZES=EX.map(p=>({...p}));
+function allPrizes(){return (gst&&gst.prizes&&gst.prizes.length)?gst.prizes:DEFAULT_PRIZES;}
 const DEFAULT_SHOP=[
   {id:"dollars", icon:"💵",name:"Exchange for dollars",   cost:1,  desc:"1 token = 1 dollar"},
   {id:"activity",icon:"🎉",name:"Fun activity with parent",cost:10, desc:"Choose any fun activity!"},
@@ -395,12 +396,12 @@ const PEN_CAT_STYLE={"🗣️ Communication":{bg:"#FFF3E0",fg:"#BF360C"},"💥 B
 
 let weekKey=isoStr(getThisMonday());
 let todayOffset=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
-let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,penEditId=null,showPenAdd=false,gpEditId=null,showGpAdd=false;
+let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,penEditId=null,showPenAdd=false,gpEditId=null,showGpAdd=false,przEditId=null,showPrzAdd=false;
 let pendingBonus={},pendingTok=0,pendingPen=null;
 function pkBon(id,di){return di+":"+id;}
 function pendB(id,di){return pendingBonus[pkBon(id,di)]||0;}
 function defW(){return{dt:{},penalties:[],starsRestored:0,log:[],spent:[],starChoice:null};}
-function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(DEFAULT_SHOP)),customTasks:[],customPenalties:[],gachaLog:[],gachaPrizes:JSON.parse(JSON.stringify(DEFAULT_GACHA))};}
+function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(DEFAULT_SHOP)),customTasks:[],customPenalties:[],gachaLog:[],gachaPrizes:JSON.parse(JSON.stringify(DEFAULT_GACHA)),prizes:JSON.parse(JSON.stringify(DEFAULT_PRIZES))};}
 let wst,gst;
 
 function dayIso(o){return addD(weekKey,o);}
@@ -424,6 +425,7 @@ function load(){
   if(!gst.customPenalties)gst.customPenalties=[];
   if(!gst.gachaLog)gst.gachaLog=[];
   if(!gst.gachaPrizes||!gst.gachaPrizes.length)gst.gachaPrizes=JSON.parse(JSON.stringify(DEFAULT_GACHA));
+  if(!gst.prizes||!gst.prizes.length)gst.prizes=JSON.parse(JSON.stringify(DEFAULT_PRIZES));
 }
 function sv(){
   try{localStorage.setItem("sq_w_"+weekKey,JSON.stringify(wst));}catch{}
@@ -462,10 +464,10 @@ function render(){
   const bonPend=rem>=BON_THRESH&&!wst.starChoice;
   const lost=lostPts();
   document.getElementById("ns").textContent=wLabel();
-  document.getElementById("sd").textContent=ep+"/"+TOTAL_REQ_PTS;
-  document.getElementById("ss").textContent=rem;
-  document.getElementById("stok").textContent=gst.tokens;
-  document.getElementById("sp").textContent="−"+penCnt();
+  const _sd=document.getElementById("sd");if(_sd)_sd.textContent=ep+"/"+TOTAL_REQ_PTS;
+  const _ss=document.getElementById("ss");if(_ss)_ss.textContent=rem;
+  const _stok=document.getElementById("stok");if(_stok)_stok.textContent=gst.tokens;
+  const _sp=document.getElementById("sp");if(_sp)_sp.textContent="−"+penCnt();
   document.getElementById("rpl").textContent=ep+"/"+TOTAL_REQ_PTS+" pts"+(lost>0?" (−"+lost+" pen)":"");
   document.getElementById("bpl").textContent=rem+" ⭐ left"+(spent>0?` · ${bs} earned · −${spent} spent`:` · ${bs} earned`)+(rem>=BON_THRESH&&!wst.starChoice?" — decide Sunday!":"");
   document.getElementById("rpb").style.width=Math.min(100,Math.round(ep/TOTAL_REQ_PTS*100))+"%";
@@ -479,7 +481,7 @@ function render(){
     d.innerHTML=`<div class="unit-emoji">${c.e?(c.b?"⭐":"🏆"):c.p?"⏳":"🔒"}</div><div class="unit-label">${c.l}<br>${c.e?"Earned":c.p?"Decide Sun":"Locked"}</div>`;
     urEl.appendChild(d);
   });
-  rDays();rDaySummary();rTaskSections();rPenLog();rSunday();rShop();rGacha();
+  rDays();rDaySummary();rTaskSections();rPenLog();rProfile();rSunday();rShop();rGacha();
 }
 
 function rDays(){
@@ -589,6 +591,20 @@ function rPenLog(){
   });
 }
 
+function rProfile(){
+  const body=document.getElementById("prof-body");if(!body)return;
+  const ep=effPts(),bs=bonEarned(),rem=bonAvail(),sp=bonSpent();
+  const sRest=starsRest(),sGach=wst.starsSpentGacha||0,sChoice=wst.starsSpentChoice||0;
+  const tok=gst.tokens||0,pens=penCnt(),lost=lostPts();
+  const slots=totU(),usedSlots=(wst.spent||[]).length,freeSlots=Math.max(0,slots-usedSlots);
+  const card=(title,body,bg,br)=>`<div style="background:${bg};border:2px solid ${br};border-radius:16px;padding:13px 15px;margin-bottom:12px;box-shadow:0 2px 0 ${br};"><div style="font-size:12px;font-weight:800;color:var(--sub);margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px;">${title}</div>${body}</div>`;
+  const row=(lbl,val,color)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;"><span style="font-size:13px;color:var(--text);font-weight:600;">${lbl}</span><span style="font-size:14px;color:${color||'var(--text)'};font-weight:800;">${val}</span></div>`;
+  const ptsBody=row("Earned",`${ep}/${TOTAL_REQ_PTS}`,"var(--blue)")+(lost>0?row("Lost to penalties",`−${lost}`,"var(--red)"):"")+row("Prize slots",`${freeSlots} free · ${usedSlots} used`,slots>0?"var(--green)":"var(--sub)");
+  const starsBody=row("Earned",`${bs} ⭐`,"var(--yellow-d)")+row("Spent total",`−${sp}`,sp>0?"var(--red)":"var(--sub)")+(sRest>0?row("  · on restore",`−${sRest}`,"var(--sub)"):"")+(sGach>0?row("  · on gacha",`−${sGach}`,"var(--sub)"):"")+(sChoice>0?row("  · on "+(wst.starChoice==='screen'?'bonus prize':'tokens'),`−${sChoice}`,"var(--sub)"):"")+row("Remaining",`${rem} ⭐`,rem>0?"var(--green)":"var(--sub)");
+  const tokBody=row("Balance",`🟡 ${tok}`,"var(--amber)")+row("Redemptions",`${(gst.shopLog||[]).length} total`,"var(--sub)");
+  const penBody=row("This week",`${pens}`,pens>0?"var(--red)":"var(--green)")+(sRest>0?row("Restored with ⭐",`${sRest}`,"var(--green)"):"")+`<button class="add-btn" style="margin-top:8px;" onclick="openPenLog()">View penalty log ›</button>`;
+  body.innerHTML=`<div class="sec-label" style="margin-top:0;">📅 ${wLabel()}</div>`+card("⚡ Required Points",ptsBody,"#fff","var(--border)")+card("🌟 Bonus Stars",starsBody,"#fff","var(--border)")+card("🟡 Tokens",tokBody,"#fff","var(--border)")+card("⚠️ Penalties",penBody,"#fff","var(--border)");
+}
 function rSunday(){
   const pb=document.getElementById("sun-prize"),rb=document.getElementById("sun-restore");
   const sb=document.getElementById("sun-stars"),cb=document.getElementById("sun-curr");
@@ -599,9 +615,19 @@ function rSunday(){
   let ptitle=pt===0?"No prize this week":`${pt} prize${pt>1?"s":""} earned!`;
   let pdesc=pt===0?`${ep}/${TOTAL_REQ_PTS} req pts — need all ${TOTAL_REQ_PTS}.${lost>0?" Restore lost pts with ⭐ below.":""}`:`${ep}/${TOTAL_REQ_PTS} pts · Prize 1 & 2: ${baseU()}/2${bonU()?" · Bonus included":""}`;
   let spendH="";
-  if(pt>0&&pr>0){
-    spendH+=`<div style="margin-top:10px;font-size:11px;font-weight:800;color:var(--blue);margin-bottom:7px;">${pr} PRIZE${pr>1?"S":""} TO SPEND</div>`;
-    EX.forEach(ex=>{spendH+=`<div class="ex-row"><span style="font-size:22px;">${ex.icon}</span><div style="flex:1;"><div class="ex-label">${ex.label}</div><div class="ex-sub">${ex.sub}</div></div><button class="spend-btn" ${pr>=1?"":"disabled"} onclick="spendU('${ex.id}','${ex.label}','${ex.icon}')">Use 1</button></div>`;});
+  spendH+=`<div style="margin-top:10px;font-size:11px;font-weight:800;color:${pr>0?'var(--blue)':'var(--sub)'};margin-bottom:7px;">${pr>0?`${pr} PRIZE${pr>1?"S":""} TO SPEND`:"PRIZES"}</div>`;
+  allPrizes().forEach(ex=>{
+    const editing=przEditId===ex.id;
+    if(editing){
+      spendH+=`<div class="ex-row" style="flex-direction:column;align-items:stretch;gap:6px;"><div style="display:flex;gap:6px;align-items:center;"><input class="ef-input" id="prze-icon-${ex.id}" value="${ex.icon}" style="width:56px;text-align:center;"><input class="ef-input" id="prze-label-${ex.id}" value="${ex.label.replace(/"/g,'&quot;')}" placeholder="Name"></div><input class="ef-input" id="prze-sub-${ex.id}" value="${(ex.sub||'').replace(/"/g,'&quot;')}" placeholder="Description (optional)"><div class="ef-actions"><button class="save-btn" onclick="savePrizeEdit('${ex.id}')">Save</button><button class="cancel-btn" onclick="przEditId=null;render()">Cancel</button></div></div>`;
+    } else {
+      spendH+=`<div class="ex-row"><span style="font-size:22px;">${ex.icon}</span><div style="flex:1;min-width:0;"><div class="ex-label">${ex.label}</div><div class="ex-sub">${ex.sub||''}</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;"><button class="spend-btn" ${pr>=1?"":"disabled"} onclick="spendU('${ex.id}','${ex.label.replace(/'/g,"\\'")}','${ex.icon}')">Use 1</button><div style="display:flex;gap:4px;"><button class="edit-btn" style="padding:4px 8px;font-size:10px;" onclick="przEditId='${ex.id}';render()">Edit</button><button class="sett-del-btn" style="padding:4px 8px;font-size:10px;" onclick="deletePrize('${ex.id}')">Del</button></div></div></div>`;
+    }
+  });
+  if(showPrzAdd){
+    spendH+=`<div class="add-form" style="margin-top:8px;"><div class="add-form-title">✚ New prize</div><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="przadd-icon" placeholder="🎁" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="przadd-label" placeholder="Prize name"></div><div class="ef-row"><span class="ef-label">Desc</span><input class="ef-input" id="przadd-sub" placeholder="Description (optional)"></div><div class="ef-actions"><button class="save-btn" onclick="addPrize()">Add prize</button><button class="cancel-btn" onclick="showPrzAdd=false;render()">Cancel</button></div></div>`;
+  } else {
+    spendH+=`<button class="add-btn" style="margin-top:8px;" onclick="showPrzAdd=true;render()">＋ Add new prize</button>`;
   }
   let spentH="";
   if((wst.spent||[]).length){spentH+=`<div style="margin-top:10px;font-size:11px;font-weight:800;color:#757575;margin-bottom:5px;">REDEEMED</div>`;(wst.spent||[]).forEach(s=>{spentH+=`<div class="spent-entry"><span style="font-size:15px;">${s.icon}</span><span style="flex:1;font-size:12px;color:var(--green);font-weight:700;">${s.label}</span></div>`;});}
@@ -782,7 +808,7 @@ function adjTokens(n){
 function confirmTokens(){
   if(!pendingTok)return;const d=pendingTok;
   gst.tokens=Math.max(0,(gst.tokens||0)+pendingTok);pendingTok=0;sv();
-  document.getElementById("stok").textContent=gst.tokens;rSettBody();rShop();toast((d>0?"+":"")+d+" 🟡 applied");
+  const _stok=document.getElementById("stok");if(_stok)_stok.textContent=gst.tokens;rSettBody();rShop();render();toast((d>0?"+":"")+d+" 🟡 applied");
 }
 function cancelTokens(){if(!pendingTok)return;pendingTok=0;rSettBody();}
 function setTokensManual(){
@@ -790,7 +816,7 @@ function setTokensManual(){
   if(isNaN(v)||v<0){toast("Enter a valid number");return;}
   gst.tokens=v;sv();
   const d=document.getElementById("sett-tok-display");if(d)d.textContent="🟡 "+v;
-  document.getElementById("stok").textContent=v;rShop();toast("🟡 Set to "+v);
+  const _stok2=document.getElementById("stok");if(_stok2)_stok2.textContent=v;rShop();render();toast("🟡 Set to "+v);
 }
 function openAddForm(){showAddForm=true;rSettBody();}
 function cancelAdd(){showAddForm=false;rSettBody();}
@@ -921,6 +947,24 @@ function chooseStars(choice){
 function spendU(id,label,icon){
   if(remU()<=0)return;if(!wst.spent)wst.spent=[];
   wst.spent.push({id,label,icon,date:dayIso(todayOffset)});sv();render();toast("Enjoy! "+icon);
+}
+function addPrize(){
+  const icon=(document.getElementById("przadd-icon").value||"🎁").trim();
+  const label=(document.getElementById("przadd-label").value||"").trim();
+  const sub=(document.getElementById("przadd-sub").value||"").trim();
+  if(!label){toast("Name required");return;}
+  if(!gst.prizes)gst.prizes=[];
+  gst.prizes.push({id:"prz_"+Date.now(),icon,label,sub});
+  showPrzAdd=false;sv();render();toast("Prize added ✓");
+}
+function deletePrize(id){gst.prizes=(gst.prizes||[]).filter(p=>p.id!==id);if(przEditId===id)przEditId=null;sv();render();toast("Deleted ✓");}
+function savePrizeEdit(id){
+  const p=(gst.prizes||[]).find(x=>x.id===id);if(!p)return;
+  const icon=(document.getElementById("prze-icon-"+id).value||p.icon).trim();
+  const label=(document.getElementById("prze-label-"+id).value||p.label).trim();
+  const sub=(document.getElementById("prze-sub-"+id).value||p.sub||"").trim();
+  if(!label){toast("Name required");return;}
+  p.icon=icon;p.label=label;p.sub=sub;przEditId=null;sv();render();toast("Saved ✓");
 }
 function redeemShop(id,name,icon,cost){
   if(gst.tokens<cost)return;gst.tokens-=cost;if(!gst.shopLog)gst.shopLog=[];
