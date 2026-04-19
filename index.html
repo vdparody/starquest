@@ -20,14 +20,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
 .status-bar{background:var(--blue);padding:14px 24px 4px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .status-time{font-size:15px;font-weight:700;color:#fff;}
 .status-icons{font-size:12px;color:#fff;display:flex;gap:6px;}
-.screen{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 90px;scrollbar-width:none;}
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 16px;scrollbar-width:none;}
 .screen::-webkit-scrollbar{display:none;}
 .nav-bar{background:var(--blue);padding:10px 20px;border-bottom:3px solid var(--yellow);flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
 .nav-title{font-size:18px;font-weight:800;color:#fff;text-align:center;}
 .nav-sub{font-size:11px;color:rgba(255,255,255,0.8);text-align:center;margin-top:2px;}
 .nav-back{position:absolute;left:14px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;font-size:13px;color:#fff;cursor:pointer;font-weight:700;display:none;padding:5px 10px;border-radius:20px;}
 .nav-settings{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;font-size:17px;cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
-.tab-bar{background:var(--blue);border-top:3px solid var(--yellow);padding:8px 0 10px;display:flex;flex-shrink:0;}
+.tab-bar{background:var(--blue);border-bottom:3px solid var(--yellow);padding:8px 0 10px;display:flex;flex-shrink:0;}
 .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0;border:none;background:none;}
 .tab-icon-wrap{font-size:22px;line-height:1;padding:3px 10px;border-radius:12px;transition:all .15s;}
 .tab-item.active .tab-icon-wrap{background:var(--yellow);}
@@ -189,7 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
 .sett-del-btn{background:var(--red-l);color:var(--red);border:none;border-radius:9px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;}
 .edit-form-inner{background:#F5F7FF;padding:12px 14px;border-top:1px solid var(--border);}
 .sett-section-label{font-size:11px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;padding:14px 14px 6px;}
-.undo-banner{position:absolute;bottom:94px;left:14px;right:14px;background:#1a237e;border-radius:16px;padding:12px 15px;display:flex;align-items:center;justify-content:space-between;gap:11px;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none;z-index:99;border:2px solid var(--yellow);}
+.undo-banner{position:absolute;bottom:14px;left:14px;right:14px;background:#1a237e;border-radius:16px;padding:12px 15px;display:flex;align-items:center;justify-content:space-between;gap:11px;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none;z-index:99;border:2px solid var(--yellow);}
 .undo-banner.show{opacity:1;transform:translateY(0);pointer-events:all;}
 .um{font-size:13px;color:#fff;font-weight:700;flex:1;line-height:1.3;}
 .utw{position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 16px 16px;background:rgba(255,255,255,.2);overflow:hidden;}
@@ -235,6 +235,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
     <span class="sync-ind off" id="syncDot"></span>
     <button class="nav-settings" id="settBtn" onclick="openSettings()">⚙️</button>
   </div>
+  <div class="tab-bar" id="tb">
+    <button class="tab-item active" onclick="showTab('home',this)"><span class="tab-icon-wrap">🏠</span><span class="tab-label">Home</span></button>
+    <button class="tab-item" onclick="showTab('profile',this)"><span class="tab-icon-wrap">👤</span><span class="tab-label">Profile</span></button>
+    <button class="tab-item" onclick="showTab('sunday',this)"><span class="tab-icon-wrap">🎁</span><span class="tab-label">Prize</span></button>
+    <button class="tab-item" onclick="showTab('shop',this)"><span class="tab-icon-wrap">🟡</span><span class="tab-label">Shop</span></button>
+    <button class="tab-item" onclick="showTab('gacha',this)"><span class="tab-icon-wrap">🎰</span><span class="tab-label">Gacha</span></button>
+  </div>
   <div class="screen">
     <div id="s-home" class="section active">
       <div style="height:10px;"></div>
@@ -276,13 +283,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
       <div id="gacha-result"></div>
       <div id="gacha-log-el"></div>
     </div>
-  </div>
-  <div class="tab-bar" id="tb">
-    <button class="tab-item active" onclick="showTab('home',this)"><span class="tab-icon-wrap">🏠</span><span class="tab-label">Home</span></button>
-    <button class="tab-item" onclick="showTab('profile',this)"><span class="tab-icon-wrap">👤</span><span class="tab-label">Profile</span></button>
-    <button class="tab-item" onclick="showTab('sunday',this)"><span class="tab-icon-wrap">🎁</span><span class="tab-label">Prize</span></button>
-    <button class="tab-item" onclick="showTab('shop',this)"><span class="tab-icon-wrap">🟡</span><span class="tab-label">Shop</span></button>
-    <button class="tab-item" onclick="showTab('gacha',this)"><span class="tab-icon-wrap">🎰</span><span class="tab-label">Gacha</span></button>
   </div>
   <div class="modal-overlay" id="settModal">
     <div class="modal-sheet">
