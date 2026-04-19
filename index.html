@@ -396,6 +396,9 @@ const PEN_CAT_STYLE={"🗣️ Communication":{bg:"#FFF3E0",fg:"#BF360C"},"💥 B
 let weekKey=isoStr(getThisMonday());
 let todayOffset=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
 let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,penEditId=null,showPenAdd=false,gpEditId=null,showGpAdd=false;
+let pendingBonus={},pendingTok=0;
+function pkBon(id,di){return di+":"+id;}
+function pendB(id,di){return pendingBonus[pkBon(id,di)]||0;}
 function defW(){return{dt:{},penalties:[],starsRestored:0,log:[],spent:[],starChoice:null};}
 function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(DEFAULT_SHOP)),customTasks:[],customPenalties:[],gachaLog:[],gachaPrizes:JSON.parse(JSON.stringify(DEFAULT_GACHA))};}
 let wst,gst;
@@ -405,6 +408,7 @@ function isFut(o){return o>todayOffset;}
 function isSun(o){return o===6;}
 
 function load(){
+  pendingBonus={};pendingTok=0;
   try{wst=JSON.parse(localStorage.getItem("sq_w_"+weekKey)||"null")||defW();}catch{wst=defW();}
   try{gst=JSON.parse(localStorage.getItem("sq_g")||"null")||defG();}catch{gst=defG();}
   if(!gst.shopLog)gst.shopLog=[];
@@ -427,7 +431,7 @@ function penCnt(){return(wst.penalties||[]).length;}
 function starsRest(){return wst.starsRestored||0;}
 function effPts(){return Math.max(0,rawPts()-penCnt()+starsRest());}
 function bonEarned(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};allBT().forEach(b=>{const v=dm[b.id];if(v)t+=(typeof v==='number'?v:1);});}return t;}
-function bonAvail(){return Math.max(0,bonEarned()-starsRest()-(wst.starsSpentGacha||0));}
+function bonAvail(){if(wst.starChoice)return 0;return Math.max(0,bonEarned()-starsRest()-(wst.starsSpentGacha||0));}
 function allDone(){return effPts()>=TOTAL_REQ_PTS;}
 function baseU(){return allDone()?2:0;}
 function bonU(){return wst.starChoice==="screen"?1:0;}
@@ -525,10 +529,14 @@ function rTaskSections(){
     container.appendChild(bar);
     const list=document.createElement("div");list.className="ios-list";
     tasks.forEach(task=>{
-      const cnt=getBonusCnt(dm,task.id);const row=document.createElement("div");
-      row.className="ios-row"+(cnt>0?" done":"");row.style.opacity=fut?"0.3":"1";
+      const cnt=getBonusCnt(dm,task.id);const pend=pendB(task.id,di);const preview=Math.max(0,cnt+pend);const row=document.createElement("div");
+      row.className="ios-row"+(preview>0?" done":"");row.style.opacity=fut?"0.3":"1";
       if(!fut){
-        row.innerHTML=`<div class="biw" style="background:${task.bg};border:1.5px solid ${task.fg}33;"><span style="font-size:18px;">${task.icon}</span></div><div class="rt"><div class="rt-t">${task.name}</div><div class="rt-s">${task.sub}</div></div><div class="rr" style="gap:4px;">${cnt>0?`<button onclick="event.stopPropagation();decBonus('${task.id}','${di}')" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--border);background:#f5f5f5;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--sub);">−</button>`:''}<span style="font-size:12px;font-weight:800;color:${cnt>0?'var(--yellow-d)':'var(--sub)'};min-width:18px;text-align:center;">${cnt>0?cnt+'⭐':'⭐'}</span><button onclick="event.stopPropagation();incBonus('${task.id}','${di}')" style="width:26px;height:26px;border-radius:50%;border:2px solid ${task.fg}44;background:${task.bg};font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:800;color:${task.fg};">+</button></div>`;
+        const valColor=pend!==0?'var(--blue)':(preview>0?'var(--yellow-d)':'var(--sub)');
+        const valTxt=preview>0?preview+'⭐':'⭐';
+        const pendTag=pend!==0?`<span style="font-size:10px;font-weight:800;color:var(--blue);margin-right:4px;">${pend>0?'+':''}${pend}</span>`:'';
+        const confirmBtns=pend!==0?`<button onclick="event.stopPropagation();confirmBonus('${task.id}','${di}')" style="height:26px;padding:0 9px;border-radius:13px;border:none;background:var(--green);color:#fff;font-size:11px;font-weight:800;cursor:pointer;">✓</button><button onclick="event.stopPropagation();cancelBonus('${task.id}','${di}')" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--border);background:#f5f5f5;font-size:14px;cursor:pointer;font-weight:800;color:var(--sub);">✕</button>`:'';
+        row.innerHTML=`<div class="biw" style="background:${task.bg};border:1.5px solid ${task.fg}33;"><span style="font-size:18px;">${task.icon}</span></div><div class="rt"><div class="rt-t">${task.name}</div><div class="rt-s">${task.sub}</div></div><div class="rr" style="gap:4px;">${preview>0?`<button onclick="event.stopPropagation();decBonus('${task.id}','${di}')" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--border);background:#f5f5f5;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--sub);">−</button>`:''}${pendTag}<span style="font-size:12px;font-weight:800;color:${valColor};min-width:18px;text-align:center;">${valTxt}</span><button onclick="event.stopPropagation();incBonus('${task.id}','${di}')" style="width:26px;height:26px;border-radius:50%;border:2px solid ${task.fg}44;background:${task.bg};font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:800;color:${task.fg};">+</button>${confirmBtns}</div>`;
       } else {
         row.innerHTML=`<div class="biw" style="background:${task.bg};border:1.5px solid ${task.fg}33;"><span style="font-size:18px;">${task.icon}</span></div><div class="rt"><div class="rt-t">${task.name}</div><div class="rt-s">${task.sub}</div></div><div class="rr"><span style="font-size:12px;color:var(--sub);">⭐</span></div>`;
       }
@@ -592,7 +600,7 @@ function rSunday(){
   if(avail>0||pC){
     if(!pC){const cs=avail>=BON_THRESH;
       sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:14px;margin-bottom:14px;border:2px solid ${cs?"var(--yellow)":"var(--border)"};box-shadow:0 2px 0 ${cs?"var(--yellow-d)":"var(--border)"};"><div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">${avail} ⭐ available</div><div style="font-size:12px;color:var(--sub);margin-bottom:12px;font-weight:600;">${cs?"Spend 10 ⭐ to unlock a bonus prize, or save all as 🟡 tokens.":"You need 10 ⭐ to unlock a bonus prize. Save as tokens instead."}</div><div class="choice-row"><button class="choice-btn screen" onclick="chooseStars('screen')" ${cs?"":"disabled"}>🎮 Bonus Prize<span>spend 10 ⭐</span></button><button class="choice-btn tokens" onclick="chooseStars('tokens')">🟡 Save Tokens<span>${avail} ⭐ → ${avail} 🟡</span></button></div></div>`;
-    } else {const pTxt=pC==="screen"?"Bonus prize unlocked! 🎉":`${avail} ⭐ saved as ${avail} 🟡 tokens!`;sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:11px 14px;margin-bottom:14px;border:2px solid var(--border);"><span class="chosen-pill ${pC}">${pTxt}</span></div>`;}
+    } else {const cashed=wst.starsCashed||0;const pTxt=pC==="screen"?"Bonus prize unlocked! 🎉":`${cashed} ⭐ saved as ${cashed} 🟡 tokens!`;sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:11px 14px;margin-bottom:14px;border:2px solid var(--border);"><span class="chosen-pill ${pC}">${pTxt}</span></div>`;}
   } else sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars</div><div style="background:var(--card);border-radius:18px;padding:14px;margin-bottom:14px;border:2px solid var(--border);text-align:center;color:var(--sub);font-size:13px;font-weight:600;">No bonus stars earned yet this week.</div>`;
   const ce=effPts(),cbs=bonEarned(),ctu=totU();
   cb.innerHTML=`<div class="sec-label">📊 Week Progress</div><div style="background:var(--card);border-radius:14px;padding:13px 15px;border:2px solid var(--border);box-shadow:0 2px 0 var(--border);"><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="font-size:12px;font-weight:700;color:var(--text);">Required points</span><span style="font-size:12px;color:var(--blue);font-weight:800;">${ce}/${TOTAL_REQ_PTS} ${ce>=TOTAL_REQ_PTS?"✅":""}</span></div><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="font-size:12px;font-weight:700;color:var(--text);">Bonus stars</span><span style="font-size:12px;color:var(--yellow);font-weight:800;">${cbs} ⭐</span></div><div style="display:flex;justify-content:space-between;"><span style="font-size:12px;font-weight:700;color:var(--text);">On track for</span><span style="font-size:12px;color:${ctu>0?"var(--green)":"var(--sub)"};font-weight:800;">${ctu} prize${ctu!==1?"s":""}</span></div></div>`;
@@ -693,7 +701,9 @@ function rSettBody(){
   // ── Token Balance section ──
   body.innerHTML+=`<div class="sett-section-label">🟡 Token Balance</div>`;
   const tokDiv=document.createElement("div");tokDiv.className="tok-editor";
-  tokDiv.innerHTML=`<div class="tok-editor-title">Adjust token balance</div><div class="tok-current" id="sett-tok-display">🟡 ${gst.tokens}</div><div class="tok-adj-grid"><button class="tok-adj-btn plus" onclick="adjTokens(1)">+1</button><button class="tok-adj-btn plus" onclick="adjTokens(5)">+5</button><button class="tok-adj-btn plus" onclick="adjTokens(10)">+10</button><button class="tok-adj-btn minus" onclick="adjTokens(-1)">−1</button><button class="tok-adj-btn minus" onclick="adjTokens(-5)">−5</button><button class="tok-adj-btn minus" onclick="adjTokens(-10)">−10</button></div><div class="tok-manual-row"><input class="tok-input" id="tok-manual-inp" type="number" min="0" placeholder="Set exact amount" value="${gst.tokens}"><button class="tok-set-btn" onclick="setTokensManual()">Set</button></div>`;
+  const _tp=pendingTok,_tprev=Math.max(0,gst.tokens+_tp);
+  const _tpHtml=_tp!==0?`<div style="font-size:12px;font-weight:700;color:var(--blue);text-align:center;margin:4px 0;">Pending ${_tp>0?'+':''}${_tp} → 🟡 ${_tprev}</div><div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px;"><button class="tok-set-btn" style="background:var(--green);" onclick="confirmTokens()">✓ Confirm</button><button class="tok-set-btn" style="background:var(--sub);" onclick="cancelTokens()">✕ Cancel</button></div>`:'';
+  tokDiv.innerHTML=`<div class="tok-editor-title">Adjust token balance</div><div class="tok-current" id="sett-tok-display">🟡 ${gst.tokens}</div><div class="tok-adj-grid"><button class="tok-adj-btn plus" onclick="adjTokens(1)">+1</button><button class="tok-adj-btn plus" onclick="adjTokens(5)">+5</button><button class="tok-adj-btn plus" onclick="adjTokens(10)">+10</button><button class="tok-adj-btn minus" onclick="adjTokens(-1)">−1</button><button class="tok-adj-btn minus" onclick="adjTokens(-5)">−5</button><button class="tok-adj-btn minus" onclick="adjTokens(-10)">−10</button></div>${_tpHtml}<div class="tok-manual-row"><input class="tok-input" id="tok-manual-inp" type="number" min="0" placeholder="Set exact amount" value="${gst.tokens}"><button class="tok-set-btn" onclick="setTokensManual()">Set</button></div>`;
   body.appendChild(tokDiv);
   body.innerHTML+=`<div class="sett-section-label">🛍️ Shop Items</div>`;
   const addSec=document.createElement("div");addSec.style.cssText="padding:0 14px 0;";
@@ -750,11 +760,15 @@ function rSettBody(){
   });
 }
 function adjTokens(n){
-  gst.tokens=Math.max(0,(gst.tokens||0)+n);sv();
-  const d=document.getElementById("sett-tok-display"),inp=document.getElementById("tok-manual-inp");
-  if(d)d.textContent="🟡 "+gst.tokens;if(inp)inp.value=gst.tokens;
-  document.getElementById("stok").textContent=gst.tokens;rShop();toast((n>0?"+":"")+n+" 🟡");
+  const next=pendingTok+n;if((gst.tokens||0)+next<0)return;
+  pendingTok=next;rSettBody();
 }
+function confirmTokens(){
+  if(!pendingTok)return;const d=pendingTok;
+  gst.tokens=Math.max(0,(gst.tokens||0)+pendingTok);pendingTok=0;sv();
+  document.getElementById("stok").textContent=gst.tokens;rSettBody();rShop();toast((d>0?"+":"")+d+" 🟡 applied");
+}
+function cancelTokens(){if(!pendingTok)return;pendingTok=0;rSettBody();}
 function setTokensManual(){
   const v=parseInt(document.getElementById("tok-manual-inp").value);
   if(isNaN(v)||v<0){toast("Enter a valid number");return;}
@@ -848,17 +862,22 @@ function togReq(task,di){
 }
 function getBonusCnt(dm,id){const v=dm[id];return typeof v==='number'?v:(v?1:0);}
 function incBonus(id,di){
-  if(!wst.dt[di])wst.dt[di]={};
-  const cur=getBonusCnt(wst.dt[di],id);
-  wst.dt[di][id]=cur+1;
-  sv();render();toast("⭐ Star earned! ×"+(cur+1));
+  const cur=getBonusCnt(wst.dt[di]||{},id);const k=pkBon(id,di);
+  pendingBonus[k]=(pendingBonus[k]||0)+1;render();
 }
 function decBonus(id,di){
-  if(!wst.dt[di])wst.dt[di]={};
-  const cur=getBonusCnt(wst.dt[di],id);
-  if(cur<=1)delete wst.dt[di][id];else wst.dt[di][id]=cur-1;
-  sv();render();toast(cur<=1?"Removed":"⭐ ×"+(cur-1));
+  const cur=getBonusCnt(wst.dt[di]||{},id);const k=pkBon(id,di);
+  const next=(pendingBonus[k]||0)-1;if(cur+next<0)return;
+  pendingBonus[k]=next;render();
 }
+function confirmBonus(id,di){
+  const k=pkBon(id,di);const d=pendingBonus[k]||0;if(!d)return;
+  if(!wst.dt[di])wst.dt[di]={};
+  const n=Math.max(0,getBonusCnt(wst.dt[di],id)+d);
+  if(n<=0)delete wst.dt[di][id];else wst.dt[di][id]=n;
+  delete pendingBonus[k];sv();render();toast("⭐ "+(d>0?"+":"")+d+" applied");
+}
+function cancelBonus(id,di){delete pendingBonus[pkBon(id,di)];render();}
 function applyPen(p){
   dU();snap=JSON.parse(JSON.stringify({w:wst,g:gst}));
   if(!wst.penalties)wst.penalties=[];
@@ -875,7 +894,7 @@ function restoreWithStars(){
 function chooseStars(choice){
   if(wst.starChoice)return;const avail=bonAvail();
   if(choice==="screen"&&avail<BON_THRESH){toast("Need 10 ⭐!");return;}
-  wst.starChoice=choice;if(choice==="tokens"){gst.tokens=(gst.tokens||0)+avail;}
+  wst.starChoice=choice;if(choice==="tokens"){wst.starsCashed=avail;gst.tokens=(gst.tokens||0)+avail;}
   sv();render();toast(choice==="tokens"?`🟡 +${avail} tokens!`:"🎮 Bonus prize unlocked!");
 }
 function spendU(id,label,icon){
