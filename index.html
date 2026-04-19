@@ -396,7 +396,7 @@ const PEN_CAT_STYLE={"🗣️ Communication":{bg:"#FFF3E0",fg:"#BF360C"},"💥 B
 let weekKey=isoStr(getThisMonday());
 let todayOffset=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
 let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,penEditId=null,showPenAdd=false,gpEditId=null,showGpAdd=false;
-let pendingBonus={},pendingTok=0;
+let pendingBonus={},pendingTok=0,pendingPen=null;
 function pkBon(id,di){return di+":"+id;}
 function pendB(id,di){return pendingBonus[pkBon(id,di)]||0;}
 function defW(){return{dt:{},penalties:[],starsRestored:0,log:[],spent:[],starChoice:null};}
@@ -408,12 +408,17 @@ function isFut(o){return o>todayOffset;}
 function isSun(o){return o===6;}
 
 function load(){
-  pendingBonus={};pendingTok=0;
+  pendingBonus={};pendingTok=0;pendingPen=null;
   try{wst=JSON.parse(localStorage.getItem("sq_w_"+weekKey)||"null")||defW();}catch{wst=defW();}
   try{gst=JSON.parse(localStorage.getItem("sq_g")||"null")||defG();}catch{gst=defG();}
   if(!gst.shopLog)gst.shopLog=[];
   if(!gst.shopItems||!gst.shopItems.length)gst.shopItems=JSON.parse(JSON.stringify(DEFAULT_SHOP));
   if(!Array.isArray(wst.penalties))wst.penalties=[];
+  if(typeof wst.starsSpentChoice!=="number"){
+    if(wst.starChoice==="tokens")wst.starsSpentChoice=typeof wst.starsCashed==="number"?wst.starsCashed:Math.max(0,bonEarned()-(wst.starsRestored||0)-(wst.starsSpentGacha||0));
+    else if(wst.starChoice==="screen")wst.starsSpentChoice=BON_THRESH;
+    else wst.starsSpentChoice=0;
+  }
   if(typeof gst.tokens!=="number")gst.tokens=0;
   if(!gst.customTasks)gst.customTasks=[];
   if(!gst.customPenalties)gst.customPenalties=[];
@@ -431,7 +436,8 @@ function penCnt(){return(wst.penalties||[]).length;}
 function starsRest(){return wst.starsRestored||0;}
 function effPts(){return Math.max(0,rawPts()-penCnt()+starsRest());}
 function bonEarned(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};allBT().forEach(b=>{const v=dm[b.id];if(v)t+=(typeof v==='number'?v:1);});}return t;}
-function bonAvail(){if(wst.starChoice)return 0;return Math.max(0,bonEarned()-starsRest()-(wst.starsSpentGacha||0));}
+function bonAvail(){return Math.max(0,bonEarned()-starsRest()-(wst.starsSpentGacha||0)-(wst.starsSpentChoice||0));}
+function bonSpent(){return Math.max(0,bonEarned()-bonAvail());}
 function allDone(){return effPts()>=TOTAL_REQ_PTS;}
 function baseU(){return allDone()?2:0;}
 function bonU(){return wst.starChoice==="screen"?1:0;}
@@ -452,19 +458,20 @@ function wLabel(){return fmtMD(weekKey)+" – "+fmtMD(addD(weekKey,6));}
 function render(){
   tick();
   const ep=effPts(),bs=bonEarned(),ba=baseU(),bo=bonU();
-  const bonPend=bonAvail()>=BON_THRESH&&!wst.starChoice;
+  const rem=bonAvail(),spent=bonSpent();
+  const bonPend=rem>=BON_THRESH&&!wst.starChoice;
   const lost=lostPts();
   document.getElementById("ns").textContent=wLabel();
   document.getElementById("sd").textContent=ep+"/"+TOTAL_REQ_PTS;
-  document.getElementById("ss").textContent=bs;
+  document.getElementById("ss").textContent=rem;
   document.getElementById("stok").textContent=gst.tokens;
   document.getElementById("sp").textContent="−"+penCnt();
   document.getElementById("rpl").textContent=ep+"/"+TOTAL_REQ_PTS+" pts"+(lost>0?" (−"+lost+" pen)":"");
-  document.getElementById("bpl").textContent=bs+" ⭐"+(bonAvail()>=BON_THRESH&&!wst.starChoice?" — decide Sunday!":"");
+  document.getElementById("bpl").textContent=rem+" ⭐ left"+(spent>0?` · ${bs} earned · −${spent} spent`:` · ${bs} earned`)+(rem>=BON_THRESH&&!wst.starChoice?" — decide Sunday!":"");
   document.getElementById("rpb").style.width=Math.min(100,Math.round(ep/TOTAL_REQ_PTS*100))+"%";
   document.getElementById("rpb").className="prog-fill "+(ep>=TOTAL_REQ_PTS?"green":"blue");
-  document.getElementById("bpb").style.width=Math.min(100,Math.round(bonAvail()/BON_THRESH*100))+"%";
-  document.getElementById("bpb").className="prog-fill "+(bonAvail()>=BON_THRESH?"green":"orange");
+  document.getElementById("bpb").style.width=Math.min(100,Math.round(rem/BON_THRESH*100))+"%";
+  document.getElementById("bpb").className="prog-fill "+(rem>=BON_THRESH?"green":"orange");
   const urEl=document.getElementById("ur");urEl.innerHTML="";
   [{l:"Prize 1",e:ba>=1,b:false},{l:"Prize 2",e:ba>=2,b:false},{l:"Bonus",e:bo>=1,b:true,p:bonPend}].forEach(c=>{
     const d=document.createElement("div");
@@ -547,6 +554,12 @@ function rTaskSections(){
   const penLbl=document.createElement("div");penLbl.className="sec-label";penLbl.style.marginTop="4px";
   penLbl.innerHTML=`<span>⚠️ Penalties</span><span style="font-size:10px;font-weight:700;background:var(--red-l);color:var(--red);padding:2px 9px;border-radius:20px;">−1 pt each</span>`;
   container.appendChild(penLbl);
+  if(pendingPen){
+    const pp=document.createElement("div");
+    pp.style.cssText="background:var(--red-l);border:2px solid var(--red-m);border-radius:14px;padding:10px 13px;margin-bottom:10px;display:flex;align-items:center;gap:10px;";
+    pp.innerHTML=`<span style="font-size:20px;">${pendingPen.icon}</span><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:800;color:var(--red);">Confirm penalty: ${pendingPen.name}</div><div style="font-size:11px;color:var(--sub);font-weight:600;">Will deduct 1 pt from today</div></div><button onclick="confirmPen()" style="height:30px;padding:0 12px;border-radius:15px;border:none;background:var(--red);color:#fff;font-size:12px;font-weight:800;cursor:pointer;">✓ Confirm</button><button onclick="cancelPen()" style="width:30px;height:30px;border-radius:50%;border:2px solid var(--border);background:#f5f5f5;font-size:14px;cursor:pointer;font-weight:800;color:var(--sub);">✕</button>`;
+    container.appendChild(pp);
+  }
   const penCats={};allPen().forEach(p=>{if(!penCats[p.cat])penCats[p.cat]=[];penCats[p.cat].push(p);});
   Object.entries(penCats).forEach(([cat,pens])=>{
     const cs=PEN_CAT_STYLE[cat]||{bg:"#FFEBEE",fg:"#B71C1C"};
@@ -556,8 +569,10 @@ function rTaskSections(){
     const list=document.createElement("div");list.className="ios-list";
     pens.forEach(p=>{
       const row=document.createElement("div");row.className="ios-row";
+      const isSel=pendingPen&&pendingPen.id===p.id;
+      if(isSel)row.style.background="var(--red-l)";
       row.innerHTML=`<div class="piw"><span style="font-size:17px;">${p.icon}</span></div><div class="rt"><div class="rt-t" style="color:var(--red);">${p.name}</div></div><div class="rr"><span class="rb pen-b">−1 pt</span><span class="chev">›</span></div>`;
-      row.onclick=()=>applyPen(p);list.appendChild(row);
+      row.onclick=()=>selectPen(p);list.appendChild(row);
     });
     container.appendChild(list);
   });
@@ -600,10 +615,11 @@ function rSunday(){
   if(avail>0||pC){
     if(!pC){const cs=avail>=BON_THRESH;
       sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:14px;margin-bottom:14px;border:2px solid ${cs?"var(--yellow)":"var(--border)"};box-shadow:0 2px 0 ${cs?"var(--yellow-d)":"var(--border)"};"><div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">${avail} ⭐ available</div><div style="font-size:12px;color:var(--sub);margin-bottom:12px;font-weight:600;">${cs?"Spend 10 ⭐ to unlock a bonus prize, or save all as 🟡 tokens.":"You need 10 ⭐ to unlock a bonus prize. Save as tokens instead."}</div><div class="choice-row"><button class="choice-btn screen" onclick="chooseStars('screen')" ${cs?"":"disabled"}>🎮 Bonus Prize<span>spend 10 ⭐</span></button><button class="choice-btn tokens" onclick="chooseStars('tokens')">🟡 Save Tokens<span>${avail} ⭐ → ${avail} 🟡</span></button></div></div>`;
-    } else {const cashed=wst.starsCashed||0;const pTxt=pC==="screen"?"Bonus prize unlocked! 🎉":`${cashed} ⭐ saved as ${cashed} 🟡 tokens!`;sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:11px 14px;margin-bottom:14px;border:2px solid var(--border);"><span class="chosen-pill ${pC}">${pTxt}</span></div>`;}
+    } else {const cashed=pC==='tokens'?(wst.starsSpentChoice||wst.starsCashed||0):0;const pTxt=pC==="screen"?"Bonus prize unlocked! 🎉":`${cashed} ⭐ saved as ${cashed} 🟡 tokens!`;sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:11px 14px;margin-bottom:14px;border:2px solid var(--border);"><span class="chosen-pill ${pC}">${pTxt}</span></div>`;}
   } else sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars</div><div style="background:var(--card);border-radius:18px;padding:14px;margin-bottom:14px;border:2px solid var(--border);text-align:center;color:var(--sub);font-size:13px;font-weight:600;">No bonus stars earned yet this week.</div>`;
-  const ce=effPts(),cbs=bonEarned(),ctu=totU();
-  cb.innerHTML=`<div class="sec-label">📊 Week Progress</div><div style="background:var(--card);border-radius:14px;padding:13px 15px;border:2px solid var(--border);box-shadow:0 2px 0 var(--border);"><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="font-size:12px;font-weight:700;color:var(--text);">Required points</span><span style="font-size:12px;color:var(--blue);font-weight:800;">${ce}/${TOTAL_REQ_PTS} ${ce>=TOTAL_REQ_PTS?"✅":""}</span></div><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="font-size:12px;font-weight:700;color:var(--text);">Bonus stars</span><span style="font-size:12px;color:var(--yellow);font-weight:800;">${cbs} ⭐</span></div><div style="display:flex;justify-content:space-between;"><span style="font-size:12px;font-weight:700;color:var(--text);">On track for</span><span style="font-size:12px;color:${ctu>0?"var(--green)":"var(--sub)"};font-weight:800;">${ctu} prize${ctu!==1?"s":""}</span></div></div>`;
+  const ce=effPts(),cbs=bonEarned(),ctu=totU(),csp=bonSpent(),crm=bonAvail();
+  const starsTxt=csp>0?`${cbs} ⭐ (${crm} left · −${csp} spent)`:`${cbs} ⭐`;
+  cb.innerHTML=`<div class="sec-label">📊 Week Progress</div><div style="background:var(--card);border-radius:14px;padding:13px 15px;border:2px solid var(--border);box-shadow:0 2px 0 var(--border);"><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="font-size:12px;font-weight:700;color:var(--text);">Required points</span><span style="font-size:12px;color:var(--blue);font-weight:800;">${ce}/${TOTAL_REQ_PTS} ${ce>=TOTAL_REQ_PTS?"✅":""}</span></div><div style="display:flex;justify-content:space-between;margin-bottom:9px;"><span style="font-size:12px;font-weight:700;color:var(--text);">Bonus stars</span><span style="font-size:12px;color:var(--yellow);font-weight:800;">${starsTxt}</span></div><div style="display:flex;justify-content:space-between;"><span style="font-size:12px;font-weight:700;color:var(--text);">On track for</span><span style="font-size:12px;color:${ctu>0?"var(--green)":"var(--sub)"};font-weight:800;">${ctu} prize${ctu!==1?"s":""}</span></div></div>`;
 }
 
 function rShop(){
@@ -884,6 +900,9 @@ function applyPen(p){
   wst.penalties.push({id:p.id,name:p.name,date:dayIso(todayOffset),restored:false});
   sv();render();showUB("−1 pt: "+p.name);
 }
+function selectPen(p){pendingPen=p;render();}
+function confirmPen(){if(!pendingPen)return;const p=pendingPen;pendingPen=null;applyPen(p);}
+function cancelPen(){if(!pendingPen)return;pendingPen=null;render();}
 function restoreWithStars(){
   const canR=canRestore();if(canR<=0)return;
   let left=canR;(wst.penalties||[]).forEach(pen=>{if(left>0&&!pen.restored){pen.restored=true;left--;}});
@@ -894,7 +913,9 @@ function restoreWithStars(){
 function chooseStars(choice){
   if(wst.starChoice)return;const avail=bonAvail();
   if(choice==="screen"&&avail<BON_THRESH){toast("Need 10 ⭐!");return;}
-  wst.starChoice=choice;if(choice==="tokens"){wst.starsCashed=avail;gst.tokens=(gst.tokens||0)+avail;}
+  wst.starChoice=choice;
+  if(choice==="tokens"){wst.starsSpentChoice=avail;gst.tokens=(gst.tokens||0)+avail;}
+  else{wst.starsSpentChoice=BON_THRESH;}
   sv();render();toast(choice==="tokens"?`🟡 +${avail} tokens!`:"🎮 Bonus prize unlocked!");
 }
 function spendU(id,label,icon){
