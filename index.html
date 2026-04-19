@@ -602,7 +602,7 @@ function rProfile(){
   const card=(title,body,bg,br)=>`<div style="background:${bg};border:2px solid ${br};border-radius:16px;padding:13px 15px;margin-bottom:12px;box-shadow:0 2px 0 ${br};"><div style="font-size:12px;font-weight:800;color:var(--sub);margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px;">${title}</div>${body}</div>`;
   const row=(lbl,val,color)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;"><span style="font-size:13px;color:var(--text);font-weight:600;">${lbl}</span><span style="font-size:14px;color:${color||'var(--text)'};font-weight:800;">${val}</span></div>`;
   const ptsBody=row("Earned",`${ep}/${TOTAL_REQ_PTS}`,"var(--blue)")+(lost>0?row("Lost to penalties",`−${lost}`,"var(--red)"):"")+row("Prize slots",`${freeSlots} free · ${usedSlots} used`,slots>0?"var(--green)":"var(--sub)");
-  const starsBody=row("Earned",`${bs} ⭐`,"var(--yellow-d)")+row("Spent total",`−${sp}`,sp>0?"var(--red)":"var(--sub)")+(sRest>0?row("  · on restore",`−${sRest}`,"var(--sub)"):"")+(sGach>0?row("  · on gacha",`−${sGach}`,"var(--sub)"):"")+(sChoice>0?row("  · on "+(wst.starChoice==='screen'?'bonus prize':'tokens'),`−${sChoice}`,"var(--sub)"):"")+row("Remaining",`${rem} ⭐`,rem>0?"var(--green)":"var(--sub)");
+  const starsBody=row("Earned",`${bs} ⭐`,"var(--yellow-d)")+(sp>0?row("Spent total",`−${sp}`,"var(--red)"):"")+(sRest>0?row("  · on restore",`−${sRest}`,"var(--sub)"):"")+(sGach>0?row("  · on gacha",`−${sGach}`,"var(--sub)"):"")+(sChoice>0?row("  · on "+(wst.starChoice==='screen'?'bonus prize':'tokens'),`−${sChoice}`,"var(--sub)"):"")+row("Remaining",`${rem} ⭐`,rem>0?"var(--green)":"var(--sub)");
   const tokBody=row("Balance",`🟡 ${tok}`,"var(--amber)")+row("Redemptions",`${(gst.shopLog||[]).length} total`,"var(--sub)");
   const penBody=row("This week",`${pens}`,pens>0?"var(--red)":"var(--green)")+(sRest>0?row("Restored with ⭐",`${sRest}`,"var(--green)"):"")+`<button class="add-btn" style="margin-top:8px;" onclick="openPenLog()">View penalty log ›</button>`;
   body.innerHTML=`<div class="sec-label" style="margin-top:0;">📅 ${wLabel()}</div>`+card("⚡ Required Points",ptsBody,"#fff","var(--border)")+card("🌟 Bonus Stars",starsBody,"#fff","var(--border)")+card("🟡 Tokens",tokBody,"#fff","var(--border)")+card("⚠️ Penalties",penBody,"#fff","var(--border)");
@@ -643,7 +643,7 @@ function rSunday(){
   if(avail>0||pC){
     if(!pC){const cs=avail>=BON_THRESH;
       sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:14px;margin-bottom:14px;border:2px solid ${cs?"var(--yellow)":"var(--border)"};box-shadow:0 2px 0 ${cs?"var(--yellow-d)":"var(--border)"};"><div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">${avail} ⭐ available</div><div style="font-size:12px;color:var(--sub);margin-bottom:12px;font-weight:600;">${cs?"Spend 10 ⭐ to unlock a bonus prize, or save all as 🟡 tokens.":"You need 10 ⭐ to unlock a bonus prize. Save as tokens instead."}</div><div class="choice-row"><button class="choice-btn screen" onclick="chooseStars('screen')" ${cs?"":"disabled"}>🎮 Bonus Prize<span>spend 10 ⭐</span></button><button class="choice-btn tokens" onclick="chooseStars('tokens')">🟡 Save Tokens<span>${avail} ⭐ → ${avail} 🟡</span></button></div></div>`;
-    } else {const cashed=pC==='tokens'?(wst.starsSpentChoice||wst.starsCashed||0):0;const pTxt=pC==="screen"?"Bonus prize unlocked! 🎉":`${cashed} ⭐ saved as ${cashed} 🟡 tokens!`;sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:11px 14px;margin-bottom:14px;border:2px solid var(--border);"><span class="chosen-pill ${pC}">${pTxt}</span></div>`;}
+    } else {const cashed=pC==='tokens'?(wst.starsSpentChoice||wst.starsCashed||0):0;const pTxt=pC==="screen"?"Bonus prize unlocked! 🎉":`${cashed} ⭐ saved as ${cashed} 🟡 tokens!`;sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars Decision</div><div style="background:var(--card);border-radius:18px;padding:11px 14px;margin-bottom:14px;border:2px solid var(--border);display:flex;align-items:center;gap:10px;"><span class="chosen-pill ${pC}" style="flex:1;">${pTxt}</span><button class="cancel-btn" style="padding:6px 10px;font-size:11px;" onclick="undoChoice()">Undo</button></div>`;}
   } else sb.innerHTML=`<div class="sec-label">🌟 Bonus Stars</div><div style="background:var(--card);border-radius:18px;padding:14px;margin-bottom:14px;border:2px solid var(--border);text-align:center;color:var(--sub);font-size:13px;font-weight:600;">No bonus stars earned yet this week.</div>`;
   const ce=effPts(),cbs=bonEarned(),ctu=totU(),csp=bonSpent(),crm=bonAvail();
   const starsTxt=csp>0?`${cbs} ⭐ (${crm} left · −${csp} spent)`:`${cbs} ⭐`;
@@ -949,6 +949,16 @@ function restoreWithStars(){
   wst.starsRestored=(wst.starsRestored||0)+canR;
   sv();render();
   toast(effPts()>=TOTAL_REQ_PTS?"⭐ Restored! Prize unlocked! 🏆":`⭐ Restored ${canR} pt${canR>1?"s":""}!`);
+}
+function undoChoice(){
+  if(!wst.starChoice)return;
+  if(!confirm("Undo the Sunday decision? Stars committed to the prize will return to available."))return;
+  if(wst.starChoice==='tokens'){
+    const cashed=wst.starsSpentChoice||wst.starsCashed||0;
+    gst.tokens=Math.max(0,(gst.tokens||0)-cashed);
+  }
+  wst.starChoice=null;wst.starsSpentChoice=0;delete wst.starsCashed;
+  sv();render();toast("Decision undone ✓");
 }
 function chooseStars(choice){
   if(wst.starChoice)return;const avail=bonAvail();
