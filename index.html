@@ -469,11 +469,13 @@ function render(){
   const _stok=document.getElementById("stok");if(_stok)_stok.textContent=gst.tokens;
   const _sp=document.getElementById("sp");if(_sp)_sp.textContent="−"+penCnt();
   document.getElementById("rpl").textContent=ep+"/"+TOTAL_REQ_PTS+" pts"+(lost>0?" (−"+lost+" pen)":"");
-  document.getElementById("bpl").textContent=rem+" ⭐ left"+(spent>0?` · ${bs} earned · −${spent} spent`:` · ${bs} earned`)+(rem>=BON_THRESH&&!wst.starChoice?" — decide Sunday!":"");
+  let pBonTot=0;for(const k in pendingBonus)pBonTot+=pendingBonus[k];
+  const bsPrev=Math.max(0,bs+pBonTot);
+  document.getElementById("bpl").textContent=`${bsPrev} ⭐ earned`+(pBonTot!==0?` (pending ${pBonTot>0?'+':''}${pBonTot})`:"")+(spent>0?` · ${rem} left · −${spent} spent`:"")+(rem>=BON_THRESH&&!wst.starChoice?" — decide Sunday!":"");
   document.getElementById("rpb").style.width=Math.min(100,Math.round(ep/TOTAL_REQ_PTS*100))+"%";
   document.getElementById("rpb").className="prog-fill "+(ep>=TOTAL_REQ_PTS?"green":"blue");
-  document.getElementById("bpb").style.width=Math.min(100,Math.round(rem/BON_THRESH*100))+"%";
-  document.getElementById("bpb").className="prog-fill "+(rem>=BON_THRESH?"green":"orange");
+  document.getElementById("bpb").style.width=Math.min(100,Math.round(bsPrev/BON_THRESH*100))+"%";
+  document.getElementById("bpb").className="prog-fill "+(bsPrev>=BON_THRESH?"green":"orange");
   const urEl=document.getElementById("ur");urEl.innerHTML="";
   [{l:"Prize 1",e:ba>=1,b:false},{l:"Prize 2",e:ba>=2,b:false},{l:"Bonus",e:bo>=1,b:true,p:bonPend}].forEach(c=>{
     const d=document.createElement("div");
