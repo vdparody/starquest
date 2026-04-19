@@ -802,10 +802,22 @@ function rSettBody(){
     if(gpEditId===prize.id)html+=`<div class="edit-form-inner"><div class="ef-row"><span class="ef-label">Emoji</span><input class="ef-input" id="gpe-icon-${prize.id}" value="${prize.icon}" style="width:64px;text-align:center;"></div><div class="ef-row"><span class="ef-label">Name</span><input class="ef-input" id="gpe-name-${prize.id}" value="${prize.name}"></div><div class="ef-row"><span class="ef-label">Tier</span><select class="ef-select" id="gpe-tier-${prize.id}">${Object.entries(TIER_INFO).map(([k,v])=>`<option value="${k}"${k===prize.tier?' selected':''}>${v.label}</option>`).join('')}</select></div><div class="ef-actions"><button class="save-btn" onclick="saveGachaPrizeEdit('${prize.id}')">Save</button><button class="cancel-btn" onclick="gpEditId=null;rSettBody()">Cancel</button></div></div>`;
     wrap.innerHTML=html;body.appendChild(wrap);
   });
+  body.innerHTML+=`<div class="sett-section-label" style="color:var(--red);">⚠️ Danger Zone</div>`;
+  const danger=document.createElement("div");danger.style.cssText="padding:0 14px 20px;";
+  danger.innerHTML=`<button class="sett-del-btn" style="width:100%;padding:12px;font-size:13px;" onclick="resetAllData()">🗑️ Reset all data</button><div style="font-size:11px;color:var(--sub);margin-top:6px;font-weight:600;text-align:center;">Clears tasks, stars, tokens, prizes, shop, gacha, penalties, and all weekly data.</div>`;
+  body.appendChild(danger);
 }
 function adjTokens(n){
   const next=pendingTok+n;if((gst.tokens||0)+next<0)return;
   pendingTok=next;rSettBody();
+}
+function resetAllData(){
+  if(!confirm("Reset ALL data? This wipes every week, stars, tokens, prizes, shop, gacha, and penalties. Cannot be undone."))return;
+  if(!confirm("Really reset? Type OK on the next prompt to confirm."))return;
+  const pw=prompt('Type "RESET" to confirm.');if(pw!=="RESET")return;
+  Object.keys(localStorage).filter(k=>k.startsWith("sq_")).forEach(k=>localStorage.removeItem(k));
+  pendingBonus={};pendingTok=0;pendingPen=null;snap=null;
+  wst=defW();gst=defG();sv();closeSettings();render();toast("Data reset ✓");
 }
 function confirmTokens(){
   if(!pendingTok)return;const d=pendingTok;
