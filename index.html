@@ -1090,6 +1090,10 @@ async function cloudPull(){
   // Never pull while we have unpushed local changes — push first
   if(dirty||pushing){
     await cloudPush();
+    // Local state IS the authoritative latest (we just pushed it). Skip the
+    // read to avoid racing a not-yet-persisted write that would hand us back
+    // stale data and wipe the edits.
+    return false;
   }
   syncStatus='busy';updSyncDot();
   try{
