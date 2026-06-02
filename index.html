@@ -24,7 +24,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text'
 .screen::-webkit-scrollbar{display:none;}
 .nav-bar{background:var(--blue);padding:10px 20px;border-bottom:3px solid var(--yellow);flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
 .nav-title{font-size:18px;font-weight:800;color:#fff;text-align:center;}
-.nav-sub{font-size:11px;color:rgba(255,255,255,0.8);text-align:center;margin-top:2px;}
+.nav-sub{font-size:11px;color:rgba(255,255,255,0.8);text-align:center;margin-top:2px;display:flex;align-items:center;justify-content:center;gap:4px;}
+.wk-nav{background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer;width:22px;height:20px;border-radius:6px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;}
+.wk-nav:disabled{opacity:.3;cursor:not-allowed;}
+.wk-lbl{cursor:pointer;padding:0 2px;}
+.wk-lbl.past{color:#FFE082;font-weight:700;}
 .nav-back{position:absolute;left:14px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;font-size:13px;color:#fff;cursor:pointer;font-weight:700;display:none;padding:5px 10px;border-radius:20px;}
 .nav-settings{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;font-size:17px;cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 .tab-bar{background:var(--blue);border-bottom:3px solid var(--yellow);padding:8px 0 10px;display:flex;flex-shrink:0;}
@@ -394,10 +398,11 @@ const BON_THRESH=10,UD=5000,MAX_HIST=10;
 const CAT_STYLE={"🎨 Hobbies":{bg:"#EDE7F6",fg:"#4A148C"},"🏠 Chores":{bg:"#E8F5E9",fg:"#1B5E20"},"🍴 Self-care":{bg:"#FFF3E0",fg:"#BF360C"},"👨‍👩‍👧 Family":{bg:"#FCE4EC",fg:"#880E4F"},"🌅 Morning":{bg:"#E0F2F1",fg:"#00695C"}};
 const PEN_CAT_STYLE={"🗣️ Communication":{bg:"#FFF3E0",fg:"#BF360C"},"💥 Behaviour":{bg:"#FFEBEE",fg:"#B71C1C"},"🚦 Safety":{bg:"#F3E5F5",fg:"#6A1B9A"},"🧠 Responsibility":{bg:"#E3F2FD",fg:"#0D47A1"}};
 
-let weekKey=isoStr(getThisMonday());
+let currentWeekKey=isoStr(getThisMonday());
+let weekKey=currentWeekKey;
 let todayOffset=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
 let vo=todayOffset,snap=null,utimer=null,ctab="home",editId=null,showAddForm=false,btEditId=null,showBtAdd=false,penEditId=null,showPenAdd=false,gpEditId=null,showGpAdd=false,przEditId=null,showPrzAdd=false;
-let pendingBonus={},pendingTok=0,pendingPen=null;
+let pendingBonus={},pendingTok=0,pendingPen=null,pendingStars=0;
 function pkBon(id,di){return di+":"+id;}
 function pendB(id,di){return pendingBonus[pkBon(id,di)]||0;}
 function defW(){return{dt:{},penalties:[],starsRestored:0,log:[],spent:[],starChoice:null,bonusPrizes:0};}
@@ -405,7 +410,8 @@ function defG(){return{tokens:0,shopLog:[],shopItems:JSON.parse(JSON.stringify(D
 let wst,gst;
 
 function dayIso(o){return addD(weekKey,o);}
-function isFut(o){return o>todayOffset;}
+function isCurWeek(){return weekKey===currentWeekKey;}
+function isFut(o){return isCurWeek()&&o>todayOffset;}
 function isSun(o){return o===6;}
 
 function migrateWst(){
@@ -424,7 +430,7 @@ function migrateWst(){
   }
 }
 function load(){
-  pendingBonus={};pendingTok=0;pendingPen=null;
+  pendingBonus={};pendingTok=0;pendingPen=null;pendingStars=0;
   try{wst=JSON.parse(localStorage.getItem("sq_w_"+weekKey)||"null")||defW();}catch{wst=defW();}
   try{gst=JSON.parse(localStorage.getItem("sq_g")||"null")||defG();}catch{gst=defG();}
   if(!gst.shopLog)gst.shopLog=[];
@@ -447,7 +453,8 @@ function rawPts(){let p=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.
 function penCnt(){return(wst.penalties||[]).length;}
 function starsRest(){return wst.starsRestored||0;}
 function effPts(){return Math.max(0,rawPts()-penCnt()+starsRest());}
-function bonEarned(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};allBT().forEach(b=>{const v=dm[b.id];if(v)t+=(typeof v==='number'?v:1);});}return t;}
+function bonEarnedRaw(){let t=0;for(let o=0;o<=6;o++){const di=dayIso(o);const dm=wst.dt[di]||{};allBT().forEach(b=>{const v=dm[b.id];if(v)t+=(typeof v==='number'?v:1);});}return t;}
+function bonEarned(){return Math.max(0,bonEarnedRaw()+(wst.starsManualAdj||0));}
 function bonAvail(){return Math.max(0,bonEarned()-starsRest()-(wst.starsSpentGacha||0)-(wst.bonusPrizes||0)*BON_THRESH-(wst.starsConverted||0));}
 function bonSpent(){return Math.max(0,bonEarned()-bonAvail());}
 function allDone(){return effPts()>=TOTAL_REQ_PTS;}
@@ -463,8 +470,24 @@ function tick(){
   h=h%12||12;document.getElementById("clk").textContent=h+":"+(m<10?"0":"")+m+" "+ap;
   const day=n.getDay();todayOffset=day===0?6:day-1;
   const nwk=isoStr(getThisMonday());
-  if(nwk!==weekKey){weekKey=nwk;load();render();}
+  if(nwk!==currentWeekKey){
+    const wasOnCurrent=weekKey===currentWeekKey;
+    currentWeekKey=nwk;
+    if(wasOnCurrent){weekKey=nwk;load();render();}
+  }
 }
+async function jumpWeek(newKey){
+  if(newKey===weekKey)return;
+  if(newKey>currentWeekKey)newKey=currentWeekKey;
+  if(dirty||pushing)try{await cloudPush();}catch{}
+  weekKey=newKey;
+  vo=newKey===currentWeekKey?todayOffset:(newKey<currentWeekKey?6:0);
+  pendingBonus={};pendingTok=0;pendingPen=null;pendingStars=0;
+  load();render();pullAndRender();
+}
+function prevWeek(){jumpWeek(addD(weekKey,-7));}
+function nextWeek(){if(weekKey<currentWeekKey)jumpWeek(addD(weekKey,7));}
+function goCurrentWeek(){jumpWeek(currentWeekKey);}
 function wLabel(){return fmtMD(weekKey)+" – "+fmtMD(addD(weekKey,6));}
 
 function render(){
@@ -473,7 +496,8 @@ function render(){
   const rem=bonAvail(),spent=bonSpent();
   const bonPend=rem>=BON_THRESH;
   const lost=lostPts();
-  document.getElementById("ns").textContent=wLabel();
+  const _isCur=isCurWeek();
+  document.getElementById("ns").innerHTML=`<button class="wk-nav" onclick="prevWeek()" title="Previous week">‹</button><span class="wk-lbl${_isCur?'':' past'}" onclick="goCurrentWeek()" title="${_isCur?'Current week':'Tap to return to current week'}">${wLabel()}${_isCur?'':' · past'}</span><button class="wk-nav" onclick="nextWeek()" ${_isCur?'disabled':''} title="Next week">›</button>`;
   const _sd=document.getElementById("sd");if(_sd)_sd.textContent=ep+"/"+TOTAL_REQ_PTS;
   const _ss=document.getElementById("ss");if(_ss)_ss.textContent=rem;
   const _stok=document.getElementById("stok");if(_stok)_stok.textContent=gst.tokens;
@@ -523,7 +547,7 @@ function rDaySummary(){
   if(sun&&!fut){b.innerHTML=`<div class="sum-box sun"><span style="font-size:16px;">🌟</span><span class="sum-txt">Sunday — wrap up tasks &amp; collect this week's prize!</span></div>`;return;}
   const dm=wst.dt[di]||{};const req=req4day(vo);
   const dc=req.filter(r=>!!dm[r.id]).length;const allD=dc===req.length&&req.length>0;
-  const isT=vo===todayOffset;
+  const isT=isCurWeek()&&vo===todayOffset;
   const s=SCHED[vo];let rd=[];if(s.hw)rd.push("HW");if(s.bag)rd.push("Bag");if(s.les)rd.push("Lesson");
   let cls="sum-box "+(fut?"fb":allD?"done":"part");
   let txt=fut?`${DAYS_FULL[vo]} · ${rd.join(", ")}`:allD?`${DAYS_FULL[vo]}${isT?" (today)":""} · All done! +${dc} pts`:`${DAYS_FULL[vo]}${isT?" (today)":""} · ${dc}/${req.length} pts · ${rd.join(", ")}`;
@@ -609,13 +633,13 @@ function rPenLog(){
 function rProfile(){
   const body=document.getElementById("prof-body");if(!body)return;
   const ep=effPts(),bs=bonEarned(),rem=bonAvail(),sp=bonSpent();
-  const sRest=starsRest(),sGach=wst.starsSpentGacha||0,sBonus=(wst.bonusPrizes||0)*BON_THRESH,sConv=wst.starsConverted||0;
+  const sRest=starsRest(),sGach=wst.starsSpentGacha||0,sBonus=(wst.bonusPrizes||0)*BON_THRESH,sConv=wst.starsConverted||0,sManual=wst.starsManualAdj||0;
   const tok=gst.tokens||0,pens=penCnt(),lost=lostPts();
   const slots=totU(),usedSlots=(wst.spent||[]).length,freeSlots=Math.max(0,slots-usedSlots);
   const card=(title,body,bg,br)=>`<div style="background:${bg};border:2px solid ${br};border-radius:16px;padding:13px 15px;margin-bottom:12px;box-shadow:0 2px 0 ${br};"><div style="font-size:12px;font-weight:800;color:var(--sub);margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px;">${title}</div>${body}</div>`;
   const row=(lbl,val,color)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;"><span style="font-size:13px;color:var(--text);font-weight:600;">${lbl}</span><span style="font-size:14px;color:${color||'var(--text)'};font-weight:800;">${val}</span></div>`;
   const ptsBody=row("Earned",`${ep}/${TOTAL_REQ_PTS}`,"var(--blue)")+(lost>0?row("Lost to penalties",`−${lost}`,"var(--red)"):"")+row("Prize slots",`${freeSlots} free · ${usedSlots} used`,slots>0?"var(--green)":"var(--sub)");
-  const starsBody=row("Earned",`${bs} ⭐`,"var(--yellow-d)")+(sp>0?row("Spent total",`−${sp}`,"var(--red)"):"")+(sRest>0?row("  · on restore",`−${sRest}`,"var(--sub)"):"")+(sGach>0?row("  · on gacha",`−${sGach}`,"var(--sub)"):"")+(sBonus>0?row(`  · on ${wst.bonusPrizes} bonus prize${wst.bonusPrizes>1?"s":""}`,`−${sBonus}`,"var(--sub)"):"")+(sConv>0?row("  · converted to 🟡",`−${sConv}`,"var(--sub)"):"")+row("Remaining",`${rem} ⭐`,rem>0?"var(--green)":"var(--sub)");
+  const starsBody=row("Earned",`${bs} ⭐`,"var(--yellow-d)")+(sManual!==0?row("  · manual adj",`${sManual>0?'+':''}${sManual}`,sManual>0?"var(--green)":"var(--red)"):"")+(sp>0?row("Spent total",`−${sp}`,"var(--red)"):"")+(sRest>0?row("  · on restore",`−${sRest}`,"var(--sub)"):"")+(sGach>0?row("  · on gacha",`−${sGach}`,"var(--sub)"):"")+(sBonus>0?row(`  · on ${wst.bonusPrizes} bonus prize${wst.bonusPrizes>1?"s":""}`,`−${sBonus}`,"var(--sub)"):"")+(sConv>0?row("  · converted to 🟡",`−${sConv}`,"var(--sub)"):"")+row("Remaining",`${rem} ⭐`,rem>0?"var(--green)":"var(--sub)");
   const tokBody=row("Balance",`🟡 ${tok}`,"var(--amber)")+row("Redemptions",`${(gst.shopLog||[]).length} total`,"var(--sub)");
   const penBody=row("This week",`${pens}`,pens>0?"var(--red)":"var(--green)")+(sRest>0?row("Restored with ⭐",`${sRest}`,"var(--green)"):"")+`<button class="add-btn" style="margin-top:8px;" onclick="openPenLog()">View penalty log ›</button>`;
   body.innerHTML=`<div class="sec-label" style="margin-top:0;">📅 ${wLabel()}</div>`+card("⚡ Required Points",ptsBody,"#fff","var(--border)")+card("🌟 Bonus Stars",starsBody,"#fff","var(--border)")+card("🟡 Tokens",tokBody,"#fff","var(--border)")+card("⚠️ Penalties",penBody,"#fff","var(--border)");
@@ -769,6 +793,15 @@ function rSettBody(){
   const _tpHtml=_tp!==0?`<div style="font-size:12px;font-weight:700;color:var(--blue);text-align:center;margin:4px 0;">Pending ${_tp>0?'+':''}${_tp} → 🟡 ${_tprev}</div><div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px;"><button class="tok-set-btn" style="background:var(--green);" onclick="confirmTokens()">✓ Confirm</button><button class="tok-set-btn" style="background:var(--sub);" onclick="cancelTokens()">✕ Cancel</button></div>`:'';
   tokDiv.innerHTML=`<div class="tok-editor-title">Adjust token balance</div><div class="tok-current" id="sett-tok-display">🟡 ${gst.tokens}</div><div class="tok-adj-grid"><button class="tok-adj-btn plus" onclick="adjTokens(1)">+1</button><button class="tok-adj-btn plus" onclick="adjTokens(5)">+5</button><button class="tok-adj-btn plus" onclick="adjTokens(10)">+10</button><button class="tok-adj-btn minus" onclick="adjTokens(-1)">−1</button><button class="tok-adj-btn minus" onclick="adjTokens(-5)">−5</button><button class="tok-adj-btn minus" onclick="adjTokens(-10)">−10</button></div>${_tpHtml}<div class="tok-manual-row"><input class="tok-input" id="tok-manual-inp" type="number" min="0" placeholder="Set exact amount" value="${gst.tokens}"><button class="tok-set-btn" onclick="setTokensManual()">Set</button></div>`;
   body.appendChild(tokDiv);
+  // ── Star Balance section ──
+  body.innerHTML+=`<div class="sett-section-label">⭐ Star Balance${isCurWeek()?'':' · '+wLabel()}</div>`;
+  const starDiv=document.createElement("div");starDiv.className="tok-editor";starDiv.style.borderColor="var(--yellow-d)";starDiv.style.boxShadow="0 2px 0 var(--yellow-d)";
+  const _sp=pendingStars,_curStars=bonAvail(),_sprev=Math.max(0,_curStars+_sp);
+  const _spHtml=_sp!==0?`<div style="font-size:12px;font-weight:700;color:var(--blue);text-align:center;margin:4px 0;">Pending ${_sp>0?'+':''}${_sp} → ⭐ ${_sprev}</div><div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px;"><button class="tok-set-btn" style="background:var(--green);" onclick="confirmStars()">✓ Confirm</button><button class="tok-set-btn" style="background:var(--sub);" onclick="cancelStars()">✕ Cancel</button></div>`:'';
+  const _manAdj=wst.starsManualAdj||0;
+  const _manNote=_manAdj!==0?`<div style="font-size:11px;color:var(--sub);text-align:center;margin-top:6px;font-weight:600;">Current manual adjustment: ${_manAdj>0?'+':''}${_manAdj} ⭐</div>`:'';
+  starDiv.innerHTML=`<div class="tok-editor-title">Adjust star balance${isCurWeek()?'':' (past week)'}</div><div class="tok-current" style="color:var(--yellow-d);">⭐ ${_curStars}</div><div class="tok-adj-grid"><button class="tok-adj-btn plus" onclick="adjStars(1)">+1</button><button class="tok-adj-btn plus" onclick="adjStars(5)">+5</button><button class="tok-adj-btn plus" onclick="adjStars(10)">+10</button><button class="tok-adj-btn minus" onclick="adjStars(-1)">−1</button><button class="tok-adj-btn minus" onclick="adjStars(-5)">−5</button><button class="tok-adj-btn minus" onclick="adjStars(-10)">−10</button></div>${_spHtml}<div class="tok-manual-row"><input class="tok-input" id="star-manual-inp" type="number" min="0" placeholder="Set exact amount" value="${_curStars}"><button class="tok-set-btn" onclick="setStarsManual()">Set</button></div>${_manNote}`;
+  body.appendChild(starDiv);
   body.innerHTML+=`<div class="sett-section-label">🛍️ Shop Items</div>`;
   const addSec=document.createElement("div");addSec.style.cssText="padding:0 14px 0;";
   if(!showAddForm){addSec.innerHTML=`<button class="add-btn" onclick="openAddForm()">＋ Add new item</button>`;}
@@ -836,7 +869,7 @@ function resetAllData(){
   if(!confirm("Really reset? Type OK on the next prompt to confirm."))return;
   const pw=prompt('Type "RESET" to confirm.');if(pw!=="RESET")return;
   Object.keys(localStorage).filter(k=>k.startsWith("sq_")).forEach(k=>localStorage.removeItem(k));
-  pendingBonus={};pendingTok=0;pendingPen=null;snap=null;
+  pendingBonus={};pendingTok=0;pendingPen=null;pendingStars=0;snap=null;
   wst=defW();gst=defG();sv();closeSettings();render();toast("Data reset ✓");
 }
 function confirmTokens(){
@@ -851,6 +884,24 @@ function setTokensManual(){
   gst.tokens=v;sv();
   const d=document.getElementById("sett-tok-display");if(d)d.textContent="🟡 "+v;
   const _stok2=document.getElementById("stok");if(_stok2)_stok2.textContent=v;rShop();render();toast("🟡 Set to "+v);
+}
+function adjStars(n){
+  const next=pendingStars+n;
+  if(bonAvail()+next<0)return;
+  pendingStars=next;rSettBody();
+}
+function confirmStars(){
+  if(!pendingStars)return;const d=pendingStars;
+  wst.starsManualAdj=(wst.starsManualAdj||0)+pendingStars;
+  pendingStars=0;sv();rSettBody();render();toast("⭐ "+(d>0?"+":"")+d+" applied");
+}
+function cancelStars(){if(!pendingStars)return;pendingStars=0;rSettBody();}
+function setStarsManual(){
+  const v=parseInt(document.getElementById("star-manual-inp").value);
+  if(isNaN(v)||v<0){toast("Enter a valid number");return;}
+  const consumed=starsRest()+(wst.starsSpentGacha||0)+(wst.bonusPrizes||0)*BON_THRESH+(wst.starsConverted||0);
+  wst.starsManualAdj=v+consumed-bonEarnedRaw();
+  pendingStars=0;sv();rSettBody();render();toast("⭐ Set to "+v);
 }
 function openAddForm(){showAddForm=true;rSettBody();}
 function cancelAdd(){showAddForm=false;rSettBody();}
